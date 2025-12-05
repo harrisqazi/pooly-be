@@ -12,8 +12,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 }));
 
 const supabase = createClient(
-  process.env.DATABASE_URL,
-  process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_URL,     // ← This is the HTTP URL
+  process.env.SUPABASE_ANON_KEY // ← This is the anon key
 );
 
 // ========= AUTH MIDDLEWARE =========
