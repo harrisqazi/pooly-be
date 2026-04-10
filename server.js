@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { supabase } = require('./config/providers');
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors({ origin: [/vercel\.app$/, /localhost/] }));
 app.use(express.json({ limit: '10mb' }));
@@ -233,8 +234,8 @@ app.post('/api/cards/create', async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
+const port = process.env.PORT || 5000;
+app.listen(port, '0.0.0.0', () => {
   console.log(`POOLY-BE LIVE ON PORT ${port}`);
   console.log(`Provider config: ISSUING=${process.env.PROVIDER_ISSUING || 'lithic'}, BANK_RAILS=${process.env.PROVIDER_BANK_RAILS || 'modern_treasury'}, ACQUIRING=${process.env.PROVIDER_ACQUIRING || 'paytheory'}`);
 });
