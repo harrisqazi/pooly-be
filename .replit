@@ -36,3 +36,15 @@ externalPort = 80
 [deployment]
 deploymentTarget = "autoscale"
 run = ["node", "server.js"]
+
+[userenv]
+
+[userenv.shared]
+ADMIN_KEY = "pooly_admin_2026_xR9mQ8vL4nP2wZ8885n"
+AGENT_JWT_SECRET = "pooly_jwt_2026_kT7nM9xL2qW7pR4mZ8883"
+SUPABASE_URL = "https://txudnxchbsruohnstznk.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR4dWRueGNoYnNydW9obnN0em5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2NjU5ODIsImV4cCI6MjA3NzI0MTk4Mn0.buWxGSci7tYHM-DPtXoronTgEKOhID0JyaIwx-pNMvk"
+LITHIC_API_KEY = "b931a00b-fb14-4d81-b6fa-ec5153f87153"
+MODERN_TREASURY_API_KEY = "publishable-test-OTRkOGNiNWYtMzZjNy00YjU2LWIyZjMtZmRjNGIwNWNmNzhlOkxrVW1zZ0dqQ1gySHk0WEFWeERZd1dRVE5LWGpLU0NWRFNMWmJWd0RQTjFicWlrNEtrOW9EeXNTVkxxNjRBcXM="
+MODERN_TREASURY_ORGANIZATION_ID = "7e7f7655-25ec-4ff6-87fe-e1735f14ad87"
+STRIPE_SECRET_KEY = "sJ_test_51KncHmWrJIoYcXBM0YKhH9bg9d3xe6AR 8jVGKwJ1H3zXc4B0uP86gny1sqcJVicf1YwpIAUt0 jGDKTyL9wFXmT0062PbJC1a"

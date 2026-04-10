@@ -1,0 +1,427 @@
+============================================================
+STEP 1 — READ BEFORE TOUCHING ANYTHING
+============================================================
+You are working inside my existing Replit project called pooly-be.
+
+Before writing a single line of code, do ALL of the following and show me the output:
+
+1. Run: ls -R  (show full folder tree)
+2. Read and summarize every file in: routes/, middleware/, config/, utils/
+3. Read server.js and explain:
+   - How authMiddleware works and which routes it skips
+   - The exact publicRoutes array values
+   - How PROVIDER_ISSUING, PROVIDER_BANK_RAILS, PROVIDER_ACQUIRING are used
+4. List every Secret/env key present (names only, no values)
+5. Confirm these exact table names exist in Supabase:
+   groups, transactions, ledger_entries, approvals, users,
+   users_extended, webhook_events, agent_rules, agent_tokens,
+   agent_spend_log, anomaly_log
+   And confirm webhook_events columns are:
+   id, provider, event_type, event_id, payload, processed, created_at
+
+DO NOT write any code until I reply "confirmed" to your summary.
+
+============================================================
+STEP 2 — CONFIRMED SCHEMA (PASTE AFTER "CONFIRMED")
+============================================================
+Here is my verified Supabase schema. Use ONLY these column names.
+Do not invent columns. Do not add columns not listed here.
+
+groups: id(uuid), name, description, group_code, owner_id(uuid),
+  member_ids(array), approval_threshold(int), total_balance(bigint),
+  member_balances(jsonb), spending_limits(jsonb), blocked_mcc(array),
+  card_status, card_image_url, created_at, updated_at, admin_ids(jsonb),
+  allowed_merchants(jsonb), merchant_restriction_mode, merchant_limits(jsonb),
+  card_token
+
+transactions: id(uuid), group_id(uuid), user_id(uuid), type, amount(bigint),
+  description, status, merchant_name, mcc, payment_method, created_at, updated_at
+
+ledger_entries: id(uuid), transaction_id(uuid), debit_account, credit_account,
+  amount(bigint), created_at
+
+approvals: id(uuid), transaction_id(uuid), group_id(uuid), requester_id(uuid),
+  approver_id(uuid), status, approved_at, notes, created_at, updated_at
+
+users: id(uuid), email, phone, kyc_status, date_of_birth, address(jsonb),
+  ssn_last_four, settings(jsonb), created_at
+
+users_extended: id(uuid), created_at, kyc_status, kyc_documents(jsonb)
+
+webhook_events: id(uuid), provider, event_type, event_id, payload(jsonb),
+  processed(boolean), created_at
+
+agent_rules: id(uuid), group_id(uuid), daily_spend_cap(bigint),
+  max_per_txn(bigint), allowlist_mcc(text[]), quorum_required(int),
+  rules_hash(text), created_at, updated_at
+
+agent_tokens: id(uuid), group_id(uuid), token_hash(text),
+  rules_hash(text), expires_at(timestamptz), revoked(boolean), created_at
+
+agent_spend_log: id(uuid), group_id(uuid), token_hash(text),
+  amount(bigint), merchant_name(text), mcc(text), memo(text),
+  status(text), provider(text), anomaly_flag(boolean),
+  block_reason(text), created_at
+
+anomaly_log: id(uuid), group_id(uuid), event_type(text),
+  payload(jsonb), source_ip(text), resolved(boolean), created_at
+
+CRITICAL — amounts: All monetary amounts in DB are bigint in CENTS.
+Multiply by 100 before storing. Divide by 100 when returning to callers.
+Never mix cents and dollars in the same operation.
+
+============================================================
+STEP 3 — SERVER.JS CHANGES (SURGICAL, MINIMAL)
+============================================================
+In server.js make ONLY these two changes:
+
+CHANGE 1 — add '/api/agent' to publicRoutes:
+  FIND:   const publicRoutes = ['/health', '/api/webhooks'];
+  CHANGE: const publicRoutes = ['/health', '/api/webhooks', '/api/agent'];
+
+CHANGE 2 — add agent route mount below existing mounts:
+  const agentRoutes = require('./routes/agent');
+  app.use('/api/agent', agentRoutes);
+
+CHANGE 3 — update /health to show provider states:
+  app.get('/health', (req, res) => res.json({
+    status: 'POOLY BACKEND LIVE',
+    time: new Date(),
+    providers: {
+      issuing: process.env.PROVIDER_ISSUING || 'lithic',
+      bank_rails: process.env.PROVIDER_BANK_RAILS || 'modern_treasury',
+      acquiring: process.env.PROVIDER_ACQUIRING || 'paytheory',
+      stripe_enabled: process.env.PROVIDER_STRIPE === 'true'
+    }
+  }));
+
+Touch absolutely nothing else in server.js.
+
+============================================================
+STEP 4 — CREATE ROUTES/AGENT.JS (NEW FILE)
+============================================================
+Create routes/agent.js from scratch.
+Use routes/topups.js as the template for import style and structure.
+
+Required imports:
+  const express = require('express');
+  const router = express.Router();
+  const crypto = require('crypto');
+  const jwt = require('jsonwebtoken');
+  const { supabase } = require('../config/providers');
+  const idempotencyMiddleware = require('../middleware/idempotency');
+  const { createLedgerEntry, updateGroupBalance } = require('../utils/ledger');
+
+HELPER: verifyAdminKey(req, res, next)
+  Check: req.headers.authorization === 'Bearer ' + process.env.ADMIN_KEY
+  If missing or wrong: return res.status(401).json({ error: 'Invalid admin key' })
+  Otherwise: next()
+
+HELPER: computeRulesHash(rulesObj)
+  Sort keys alphabetically, JSON.stringify, then SHA256 hex digest.
+  Use crypto.createHash('sha256').update(JSON.stringify(sorted)).digest('hex')
+
+HELPER: computeTokenHash(token)
+  crypto.createHash('sha256').update(token).digest('hex')
+
+IN-MEMORY RATE TRACKER
+  const rateMap = new Map();
+  Key: group_id, Value: { count: number, resetAt: timestamp }
+  Reset when Date.now() > resetAt (60 second windows)
+  Flag (do not block) if count > 10 in the window
+
+MIDDLEWARE: verifyAgentToken(req, res, next)
+  - Extract Bearer token from Authorization header
+  - jwt.verify with process.env.AGENT_JWT_SECRET
+  - If expired or invalid: 401
+  - computeTokenHash, query agent_tokens:
+      not found → 401 'Token not registered'
+      revoked=true → 401 'Token revoked'
+      expires_at < now → 401 'Token expired'
+  - Attach: req.agentGroupId, req.agentRulesHash, req.agentTokenHash
+  - next()
+
+MIDDLEWARE: checkAgentRules(req, res, next)
+  - Fetch agent_rules WHERE group_id = req.agentGroupId
+  - If none: 403 'No rules configured for this group'
+  - amount_cents = Math.round(req.body.amount * 100)
+
+  CHECK 1 — per transaction cap:
+    if max_per_txn set AND amount_cents > max_per_txn:
+      insert agent_spend_log (status='blocked', block_reason='per_txn_cap', amount=amount_cents)
+      insert anomaly_log (event_type='rule_breach', group_id, payload={reason:'per_txn_cap'})
+      return 403 { error: 'Exceeds per-transaction cap', cap: max_per_txn/100 }
+
+  CHECK 2 — daily cap:
+    SELECT COALESCE(SUM(amount),0) FROM agent_spend_log
+    WHERE group_id=X AND status='approved'
+    AND created_at >= start of today UTC (use: new Date().setUTCHours(0,0,0,0))
+    if daily_spend_cap set AND (todaySum + amount_cents) > daily_spend_cap:
+      insert agent_spend_log (status='blocked', block_reason='daily_cap')
+      insert anomaly_log (event_type='rule_breach', payload={reason:'daily_cap'})
+      return 403 { error: 'Daily spend cap reached', cap: daily_spend_cap/100 }
+
+  CHECK 3 — MCC allowlist:
+    if allowlist_mcc set AND allowlist_mcc.length > 0
+    AND req.body.mcc provided AND NOT in allowlist_mcc:
+      insert agent_spend_log (status='blocked', block_reason='mcc_blocked')
+      return 403 { error: 'MCC not in allowlist' }
+
+  attach req.agentRules = rules row
+  next()
+
+MIDDLEWARE: anomalyDetection(req, res, next)
+  RATE CHECK:
+    get/update rateMap for req.agentGroupId
+    if count > 10 in 60s window:
+      req.anomalyFlag = true
+      req.anomalyReason = 'rate_spike'
+      insert anomaly_log (event_type='rate_spike', group_id, source_ip=req.ip)
+    (do NOT block)
+
+  IP CHECK:
+    query anomaly_log WHERE group_id=X AND created_at > 7 days ago
+    extract all source_ip values from results
+    if req.ip not in those values:
+      req.anomalyFlag = req.anomalyFlag || true
+      insert anomaly_log (event_type='new_ip', group_id, source_ip=req.ip, payload={ip:req.ip})
+    (do NOT block)
+
+  next()
+
+POST /api/agent/rules
+  Middleware: verifyAdminKey
+  Body: { group_id, daily_spend_cap, max_per_txn, allowlist_mcc, quorum_required }
+  - daily_spend_cap and max_per_txn come in as DOLLARS — store as CENTS (*100)
+  - computeRulesHash on the cents values object
+  - Upsert into agent_rules ON CONFLICT (group_id) DO UPDATE
+  - Return: { rule_id, group_id, rules_hash, daily_spend_cap_cents, max_per_txn_cents }
+
+POST /api/agent/token
+  Middleware: verifyAdminKey
+  Body: { group_id }
+  - Fetch agent_rules for group_id — 404 if none
+  - jwt.sign({ group_id, rules_hash, type:'agent' }, process.env.AGENT_JWT_SECRET, { expiresIn:'1h' })
+  - computeTokenHash
+  - expires_at = new Date(Date.now() + 3600000).toISOString()
+  - Insert into agent_tokens: { group_id, token_hash, rules_hash, expires_at }
+  - Return: { token, expires_at }
+  - NEVER log the raw token value
+
+POST /api/agent/pay
+  Middleware chain (in order):
+    idempotencyMiddleware, verifyAgentToken, checkAgentRules, anomalyDetection
+  Body: { amount, merchant_name, mcc, memo, idempotency_key }
+
+  Flow:
+  1. amount_cents = Math.round(req.body.amount * 100)
+  2. Fetch group from groups WHERE id = req.agentGroupId
+  3. If group.total_balance < amount_cents: 402 { error: 'Insufficient balance' }
+  4. Determine provider:
+       if process.env.PROVIDER_STRIPE === 'true' → stripe
+       else if process.env.PROVIDER_ISSUING === 'lithic' → lithic
+       else if process.env.PROVIDER_BANK_RAILS === 'modern_treasury' → modern_treasury
+       else → paytheory
+
+  5. Provider routing:
+     lithic:
+       fetch group.card_token — if missing: 400 'Group has no Lithic card'
+       const { lithic } = require('../config/providers')
+       simulate authorization (lithic.cards.retrieve(group.card_token))
+       provider_ref = group.card_token + '_agent_' + Date.now()
+
+     modern_treasury:
+       const { modernTreasuryClient } = require('../config/providers')
+       POST /payment_orders: { amount: amount_cents, direction:'debit',
+         currency:'USD', description: memo || 'Agent payment' }
+       provider_ref = response.data.id
+
+     paytheory:
+       const { payTheoryClient } = require('../config/providers')
+       POST /charges: { amount: amount_cents, description: memo || 'Agent payment' }
+       provider_ref = response.data.id
+
+     stripe:
+       const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
+       stripe.paymentIntents.create({
+         amount: amount_cents, currency: 'usd',
+         metadata: { group_id: req.agentGroupId, memo, token_hash: req.agentTokenHash }
+       })
+       provider_ref = paymentIntent.id
+
+  6. Insert into transactions:
+       group_id: req.agentGroupId
+       user_id: '00000000-0000-0000-0000-000000000000'
+       type: 'agent_payment'
+       amount: amount_cents
+       description: memo || 'Agent payment'
+       status: 'completed'
+       merchant_name: req.body.merchant_name || null
+       mcc: req.body.mcc || null
+       payment_method: provider used
+
+  7. createLedgerEntry({
+       transaction_id: transaction.id,
+       debit_account: 'expenses',
+       credit_account: 'cash',
+       amount: amount_cents,
+       description: memo || 'Agent payment'
+     })
+
+  8. updateGroupBalance(req.agentGroupId)
+
+  9. Insert into agent_spend_log:
+       group_id: req.agentGroupId
+       token_hash: req.agentTokenHash
+       amount: amount_cents
+       merchant_name, mcc, memo
+       status: 'approved'
+       provider: provider used
+       anomaly_flag: req.anomalyFlag || false
+
+  10. Return 200: {
+        approved: true,
+        amount_dollars: amount_cents / 100,
+        provider,
+        provider_ref,
+        transaction_id: transaction.id,
+        anomaly_flagged: req.anomalyFlag || false
+      }
+
+POST /api/agent/spend-log
+  Middleware: verifyAdminKey
+  Body: { group_id, limit=50, offset=0 }
+  - Query agent_spend_log WHERE group_id ORDER BY created_at DESC
+  - Map amount: divide by 100 for display
+  - Return: { data, total_count, limit, offset }
+
+POST /api/agent/revoke
+  Middleware: verifyAdminKey
+  Body: { token_hash }
+  - UPDATE agent_tokens SET revoked=true WHERE token_hash=token_hash
+  - Return: { revoked: true }
+
+module.exports = router;
+
+============================================================
+STEP 5 — UPDATE ROUTES/WEBHOOKS.JS (MINIMAL CHANGES ONLY)
+============================================================
+Make these changes to the existing storeWebhookEvent function only.
+Do not touch verifyHMAC, rawBodyMiddleware, or any event handler logic.
+
+UPDATE storeWebhookEvent to set event_type and processed:
+  async function storeWebhookEvent(provider, eventId, event) {
+    await supabase.from('webhook_events').insert({
+      provider,
+      event_id: eventId,
+      event_type: event.type || 'unknown',
+      payload: event,
+      processed: false
+    });
+  }
+
+After successful processing in each handler, mark processed=true:
+  await supabase.from('webhook_events')
+    .update({ processed: true })
+    .eq('provider', provider).eq('event_id', eventId);
+
+Add this console.log at the top of each webhook handler
+BEFORE any other logic:
+  console.log(`[WEBHOOK] source=${provider} | event=${event.type||'unknown'} | id=${eventId} | ip=${req.ip}`);
+
+If HMAC verification fails, before returning: insert into anomaly_log:
+  await supabase.from('anomaly_log').insert({
+    event_type: 'bad_webhook',
+    payload: { provider, source_ip: req.ip, reason: 'hmac_mismatch' }
+  });
+  Then return res.status(200).json({ received: true, error: 'invalid signature' });
+  (Always return 200 to webhook providers — never 401 or 4xx)
+
+============================================================
+STEP 6 — INSTALL STRIPE AND UPDATE CONFIG/PROVIDERS.JS
+============================================================
+Run in shell first:
+  npm install stripe
+
+In config/providers.js add at the bottom:
+  const stripe = process.env.PROVIDER_STRIPE === 'true'
+    ? require('stripe')(process.env.STRIPE_SECRET_KEY)
+    : null;
+  module.exports.stripe = stripe;
+
+Do not change any existing exports in providers.js.
+
+============================================================
+STEP 7 — TEST SCRIPT
+============================================================
+Create test-agent.sh in the project root.
+
+#!/bin/bash
+BASE_URL="${BASE_URL:-https://your-replit-url.repl.co}"
+ADMIN_KEY="${ADMIN_KEY}"
+GROUP_ID="${GROUP_ID:-paste-a-real-group-id-from-supabase-here}"
+
+echo "=== 1. Health check ==="
+curl -s "$BASE_URL/health" | jq .
+
+echo "=== 2. Create agent rules ==="
+curl -s -X POST "$BASE_URL/api/agent/rules" \
+  -H "Authorization: Bearer $ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"group_id\":\"$GROUP_ID\",\"daily_spend_cap\":100,\"max_per_txn\":25,\"quorum_required\":1}" | jq .
+
+echo "=== 3. Get agent token ==="
+TOKEN=$(curl -s -X POST "$BASE_URL/api/agent/token" \
+  -H "Authorization: Bearer $ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"group_id\":\"$GROUP_ID\"}" | jq -r '.token')
+echo "Token received: ${TOKEN:0:20}..."
+
+echo "=== 4. Agent pay — valid $5 payment ==="
+curl -s -X POST "$BASE_URL/api/agent/pay" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "idempotency-key: test-pay-001" \
+  -d "{\"amount\":5,\"merchant_name\":\"Test Merchant\",\"memo\":\"Test agent payment\",\"idempotency_key\":\"test-pay-001\"}" | jq .
+
+echo "=== 5. Agent pay — over cap ($50, should 403) ==="
+curl -s -X POST "$BASE_URL/api/agent/pay" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "idempotency-key: test-pay-002" \
+  -d "{\"amount\":50,\"merchant_name\":\"Test Merchant\",\"memo\":\"Over cap test\",\"idempotency_key\":\"test-pay-002\"}" | jq .
+
+echo "=== 6. Spend log ==="
+curl -s -X POST "$BASE_URL/api/agent/spend-log" \
+  -H "Authorization: Bearer $ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"group_id\":\"$GROUP_ID\",\"limit\":10}" | jq .
+
+echo "=== 7. Revoke token ==="
+TOKEN_HASH=$(echo -n "$TOKEN" | sha256sum | cut -d' ' -f1)
+curl -s -X POST "$BASE_URL/api/agent/revoke" \
+  -H "Authorization: Bearer $ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"token_hash\":\"$TOKEN_HASH\"}" | jq .
+
+echo "=== 8. Pay with revoked token (should 401) ==="
+curl -s -X POST "$BASE_URL/api/agent/pay" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "idempotency-key: test-pay-003" \
+  -d "{\"amount\":5,\"memo\":\"Should fail\",\"idempotency_key\":\"test-pay-003\"}" | jq .
+
+============================================================
+HARD RULES — NEVER VIOLATE
+============================================================
+NEVER remove or modify existing routes in server.js, routes/*, or middleware/*
+NEVER change rawBodyMiddleware or verifyHMAC in webhooks.js
+NEVER hardcode secrets — all keys from process.env only
+NEVER invent Supabase columns not in the schema above
+NEVER mix cents and dollars — DB always stores bigint cents
+NEVER log raw JWT tokens — only log token_hash
+ALWAYS show each modified file in full, not as a diff
+ALWAYS add // MODIFIED: [date] — what changed at top of changed files
+ALWAYS add // NEW FILE: [date] at top of new files
+ALWAYS use sentinel UUID '00000000-0000-0000-0000-000000000000' for agent user_id
+ALWAYS divide amounts by 100 when returning to API callers
