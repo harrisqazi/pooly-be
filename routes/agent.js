@@ -1,4 +1,5 @@
-// NEW FILE: 2026-04-11 — Agent autonomous payment route
+// MODIFIED: 2026-04-11 — add agent_name/agent_version to token issuance,
+//   propagate to spend log, add GET /audit fraud dashboard endpoint
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
@@ -78,6 +79,8 @@ async function verifyAgentToken(req, res, next) {
   req.agentGroupId = record.group_id;
   req.agentRulesHash = record.rules_hash;
   req.agentTokenHash = tokenHash;
+  req.agentName = record.agent_name;
+  req.agentVersion = record.agent_version;
   next();
 }
 
@@ -108,7 +111,9 @@ async function checkAgentRules(req, res, next) {
       mcc: req.body.mcc || null,
       memo: req.body.memo || null,
       status: 'blocked',
-      block_reason: 'per_txn_cap'
+      block_reason: 'per_txn_cap',
+      agent_name: req.agentName || null,
+      agent_version: req.agentVersion || null
     });
     await supabase.from('anomaly_log').insert({
       group_id: req.agentGroupId,
@@ -123,7 +128,7 @@ async function checkAgentRules(req, res, next) {
   // CHECK 2 — daily cap
   if (rules.daily_spend_cap) {
     const todayStart = new Date(new Date().setUTCHours(0, 0, 0, 0)).toISOString();
-    const { data: dailyRows, error: dailyError } = await supabase
+    const { data: dailyRows } = await supabase
       .from('agent_spend_log')
       .select('amount')
       .eq('group_id', req.agentGroupId)
@@ -141,7 +146,9 @@ async function checkAgentRules(req, res, next) {
         mcc: req.body.mcc || null,
         memo: req.body.memo || null,
         status: 'blocked',
-        block_reason: 'daily_cap'
+        block_reason: 'daily_cap',
+        agent_name: req.agentName || null,
+        agent_version: req.agentVersion || null
       });
       await supabase.from('anomaly_log').insert({
         group_id: req.agentGroupId,
@@ -165,7 +172,9 @@ async function checkAgentRules(req, res, next) {
         mcc: req.body.mcc || null,
         memo: req.body.memo || null,
         status: 'blocked',
-        block_reason: 'mcc_blocked'
+        block_reason: 'mcc_blocked',
+        agent_name: req.agentName || null,
+        agent_version: req.agentVersion || null
       });
       return res.status(403).json({ error: 'MCC not in allowlist' });
     }
@@ -274,8 +283,10 @@ router.post('/rules', verifyAdminKey, async (req, res) => {
 
 router.post('/token', verifyAdminKey, async (req, res) => {
   try {
-    const { group_id } = req.body;
+    const { group_id, agent_name, agent_version = 'v1' } = req.body;
+
     if (!group_id) return res.status(400).json({ error: 'group_id is required' });
+    if (!agent_name) return res.status(400).json({ error: 'agent_name is required' });
 
     const { data: rules, error: rulesError } = await supabase
       .from('agent_rules')
@@ -296,7 +307,14 @@ router.post('/token', verifyAdminKey, async (req, res) => {
 
     const { error: insertError } = await supabase
       .from('agent_tokens')
-      .insert({ group_id, token_hash, rules_hash: rules.rules_hash, expires_at });
+      .insert({
+        group_id,
+        token_hash,
+        rules_hash: rules.rules_hash,
+        expires_at,
+        agent_name,
+        agent_version
+      });
 
     if (insertError) return res.status(500).json({ error: insertError.message });
 
@@ -425,7 +443,9 @@ router.post(
         memo: memo || null,
         status: 'approved',
         provider,
-        anomaly_flag: req.anomalyFlag || false
+        anomaly_flag: req.anomalyFlag || false,
+        agent_name: req.agentName || null,
+        agent_version: req.agentVersion || null
       });
 
       return res.json({
@@ -462,6 +482,8 @@ router.post('/spend-log', verifyAdminKey, async (req, res) => {
 
     const mapped = (data || []).map(row => ({
       ...row,
+      agent_name: row.agent_name || null,
+      agent_version: row.agent_version || null,
       amount_dollars: Number(row.amount) / 100
     }));
 
@@ -488,6 +510,81 @@ router.post('/revoke', verifyAdminKey, async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
 
     return res.json({ revoked: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/agent/audit?group_id=xxx
+// ─────────────────────────────────────────────────────────────
+
+router.get('/audit', verifyAdminKey, async (req, res) => {
+  try {
+    const { group_id } = req.query;
+    if (!group_id) return res.status(400).json({ error: 'group_id is required' });
+
+    const { data: rows, error } = await supabase
+      .from('agent_spend_log')
+      .select('agent_name, agent_version, amount, status, anomaly_flag, created_at')
+      .eq('group_id', group_id)
+      .order('created_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    // Group by agent_name in JS
+    const agentMap = new Map();
+
+    for (const row of rows || []) {
+      const name = row.agent_name || '(unknown)';
+      if (!agentMap.has(name)) {
+        agentMap.set(name, {
+          agent_name: name,
+          agent_version: row.agent_version || null,
+          total_spent_cents: 0,
+          transaction_count: 0,
+          blocked_count: 0,
+          anomaly_count: 0,
+          last_seen: row.created_at
+        });
+      }
+
+      const entry = agentMap.get(name);
+
+      // Keep the most recent agent_version seen
+      if (row.created_at >= entry.last_seen) {
+        entry.last_seen = row.created_at;
+        entry.agent_version = row.agent_version || entry.agent_version;
+      }
+
+      if (row.status === 'approved') {
+        entry.total_spent_cents += Number(row.amount);
+        entry.transaction_count += 1;
+      }
+
+      if (row.status === 'blocked') {
+        entry.blocked_count += 1;
+      }
+
+      if (row.anomaly_flag === true) {
+        entry.anomaly_count += 1;
+      }
+    }
+
+    const result = Array.from(agentMap.values())
+      .map(entry => ({
+        agent_name: entry.agent_name,
+        agent_version: entry.agent_version,
+        total_spent_dollars: entry.total_spent_cents / 100,
+        transaction_count: entry.transaction_count,
+        blocked_count: entry.blocked_count,
+        anomaly_count: entry.anomaly_count,
+        last_seen: entry.last_seen,
+        flagged: entry.blocked_count > 2 || entry.anomaly_count > 1
+      }))
+      .sort((a, b) => (b.last_seen > a.last_seen ? 1 : -1));
+
+    return res.json({ data: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
