@@ -1,0 +1,1039 @@
+The Supabase schema is fully finalized and verified.
+Here is the complete picture. Read everything before 
+touching any file.
+
+=== FINAL VERIFIED SUPABASE SCHEMA ===
+
+TABLE: cards (renamed from groups)
+  id uuid PRIMARY KEY
+  name text
+  card_name text
+  description text
+  invite_code text UNIQUE
+  owner_id uuid (Supabase auth user id)
+  members jsonb (array of profiles.id as text strings)
+  approval_threshold int
+  total_balance bigint (cents)
+  spending_limits jsonb:
+    { "daily_cap": bigint, "max_per_txn": bigint }
+    Applies equally to ALL members human and agent.
+    Both values in cents.
+  blocked_mcc text[]
+  card_status text
+  card_image_url text
+  card_token text (Lithic virtual card token)
+  admin_ids jsonb
+  allowed_merchants jsonb
+  merchant_restriction_mode text
+  merchant_limits jsonb
+  created_at timestamptz
+  updated_at timestamptz
+
+TABLE: profiles
+  id uuid PRIMARY KEY
+  auth_id uuid UNIQUE (null for agents)
+  type text ('human' | 'agent')
+  first_name text
+  last_name text
+  email text UNIQUE
+  phone text
+  current_ip text
+  last_seen_ip text
+  last_seen timestamptz
+  model_name text (agents only)
+  model_version text (agents only)
+  system_prompt_hash text (agents only)
+  owner_id uuid REFERENCES profiles(id) (agents only)
+  kyc_status text (pending|approved|suspended)
+  kyc_submitted_at timestamptz
+  kyc_approved_at timestamptz
+  status text (active|suspended)
+  suspension_reason text
+  created_at timestamptz
+  updated_at timestamptz
+
+TABLE: kyc_details
+  id uuid PRIMARY KEY
+  profile_id uuid REFERENCES profiles(id) UNIQUE
+  fingerprint text UNIQUE
+  date_of_birth date
+  ssn_last_four text
+  ssn_hash text
+  address_line1 text
+  address_line2 text
+  city text
+  state text
+  zip text
+  country text
+  id_type text
+  id_number_hash text
+  id_verified boolean
+  id_verified_at timestamptz
+  model_card_url text
+  intended_use text
+  risk_level text
+  submitted_at timestamptz
+  reviewed_at timestamptz
+  reviewed_by uuid REFERENCES profiles(id)
+  created_at timestamptz
+  updated_at timestamptz
+
+TABLE: transactions
+  id uuid PRIMARY KEY
+  card_id uuid REFERENCES cards(id)
+  profile_id uuid REFERENCES profiles(id)
+  user_id uuid NULL
+  type text
+  amount bigint (cents)
+  description text
+  status text
+  merchant_name text
+  mcc text
+  payment_method text
+  created_at timestamptz
+  updated_at timestamptz
+
+TABLE: ledger_entries
+  id uuid PRIMARY KEY
+  transaction_id uuid
+  debit_account text
+  credit_account text
+  amount bigint (cents)
+  created_at timestamptz
+
+TABLE: approvals
+  id uuid PRIMARY KEY
+  transaction_id uuid
+  card_id uuid
+  requester_id uuid
+  approver_id uuid
+  status text
+  approved_at timestamptz
+  notes text
+  created_at timestamptz
+  updated_at timestamptz
+
+TABLE: agent_tokens
+  id uuid PRIMARY KEY
+  profile_id uuid REFERENCES profiles(id)
+  card_id uuid REFERENCES cards(id)
+  token_hash text UNIQUE
+  rules_hash text
+  expires_at timestamptz
+  revoked boolean
+  issued_from_ip text
+  created_at timestamptz
+
+TABLE: agent_spend_log
+  id uuid PRIMARY KEY
+  profile_id uuid REFERENCES profiles(id)
+  card_id uuid REFERENCES cards(id)
+  token_hash text
+  amount bigint (cents)
+  merchant_name text
+  mcc text
+  memo text
+  status text (approved|blocked|flagged)
+  provider text
+  anomaly_flag boolean
+  block_reason text
+  created_at timestamptz
+
+TABLE: anomaly_log
+  id uuid PRIMARY KEY
+  profile_id uuid REFERENCES profiles(id)
+  card_id uuid REFERENCES cards(id)
+  event_type text
+  severity text
+  score int
+  source_ip text
+  payload jsonb
+  resolved boolean
+  created_at timestamptz
+
+TABLE: webhook_events
+  id uuid PRIMARY KEY
+  provider text
+  event_type text
+  event_id text
+  payload jsonb
+  processed boolean
+  created_at timestamptz
+
+TABLE: users (Supabase auth — do not touch)
+
+VIEW: profile_risk_scores
+  Ranks all profiles by anomaly score.
+
+TABLES THAT NO LONGER EXIST — never reference these:
+  groups, agent_rules, users_extended
+
+=== RULES THAT NEVER CHANGE ===
+1. All amounts stored as bigint CENTS in DB
+2. Divide by 100 when returning to callers
+3. Multiply by 100 before storing
+4. cards.members is jsonb array of profiles.id as text
+5. Membership check: members.includes(profile.id)
+6. Human identity: req.profile (set by authMiddleware)
+7. Agent identity: req.agentProfileId (set by verifyAgentToken)
+8. spending_limits applies to everyone on the card equally
+9. NEVER log raw JWT tokens
+10. NEVER reference groups table anywhere
+
+=== FILE CHANGES REQUIRED ===
+
+--- config/providers.js ---
+REMOVE: astraClient, astraOAuthClient, ASTRA_CLIENT_ID
+KEEP: supabase, lithic, modernTreasuryClient,
+      payTheoryClient, stripe, all PROVIDER_* flags
+Show full file.
+
+--- server.js ---
+Changes:
+1. const cardsRoutes = require('./routes/cards')
+   const lithicRoutes = require('./routes/lithic')
+   Remove groupsRoutes.
+
+2. app.use('/api/cards', cardsRoutes)
+   app.use('/api/lithic', lithicRoutes)
+   Remove old /api/groups and old /api/cards mounts.
+
+3. publicRoutes = ['/health', '/api/webhooks', '/api/agent']
+
+4. authMiddleware — after verifying Supabase JWT
+   and setting req.user:
+
+   const { data: existingProfile } = await supabase
+     .from('profiles')
+     .select('*')
+     .eq('auth_id', user.id)
+     .single();
+
+   if (!existingProfile) {
+     const { data: newProfile } = await supabase
+       .from('profiles')
+       .insert({
+         auth_id: user.id,
+         type: 'human',
+         email: user.email,
+         current_ip: req.ip,
+         last_seen: new Date().toISOString(),
+         kyc_status: 'pending',
+         status: 'active'
+       })
+       .select()
+       .single();
+     req.profile = newProfile;
+   } else {
+     await supabase
+       .from('profiles')
+       .update({
+         last_seen_ip: existingProfile.current_ip,
+         current_ip: req.ip,
+         last_seen: new Date().toISOString()
+       })
+       .eq('id', existingProfile.id);
+     req.profile = existingProfile;
+   }
+
+5. Update legacy inline routes that reference
+   supabase.from('groups') → supabase.from('cards')
+   and group_id → card_id
+
+6. Keep /health as is.
+
+Show full server.js.
+
+--- routes/groups.js → RENAME TO routes/cards.js ---
+This file manages card wallet CRUD.
+Old routes/cards.js (Lithic) becomes routes/lithic.js.
+
+ALL CHANGES:
+supabase.from('groups') → supabase.from('cards')
+group_id → card_id
+group_code → invite_code
+req.user.id → req.profile.id for membership
+
+MEMBERSHIP CHECK:
+const members = card.members || []
+const isMember = members.includes(req.profile.id)
+const isOwner = card.owner_id === req.user.id
+const hasAccess = isMember || isOwner
+
+MEMBERSHIP QUERY:
+.or(`owner_id.eq.${req.user.id},members.cs.["${req.profile.id}"]`)
+
+GET / — list cards:
+Return cards where user is owner or member.
+Include card_name, invite_code, members in response.
+
+GET /:id — get card:
+Include card_name, invite_code, members.
+Verify hasAccess.
+
+POST / — create card:
+Body: { name, card_name, description }
+const { randomBytes } = require('crypto')
+const invite_code = randomBytes(6)
+  .toString('hex').toUpperCase()
+Insert:
+  name,
+  card_name: card_name || name,
+  description,
+  owner_id: req.user.id,
+  members: JSON.stringify([req.profile.id]),
+  total_balance: 0,
+  spending_limits: { daily_cap: 0, max_per_txn: 0 },
+  invite_code,
+  blocked_mcc: []
+
+POST /join — join by invite code:
+Body: { invite_code }
+Find card WHERE invite_code = invite_code (case insensitive)
+If not found: 404 { error: 'Card not found' }
+Check not already member:
+  if members.includes(req.profile.id):
+    return 400 { error: 'Already a member' }
+UPDATE cards SET
+  members = members ||
+  jsonb_build_array(req.profile.id::text)
+WHERE id = card.id
+Return updated card.
+
+DELETE /:id — delete card:
+Verify owner_id === req.user.id only.
+
+PUT /:id/limits — set spending limits:
+Auth: owner only
+Body: { daily_cap, max_per_txn }
+Verify owner_id === req.user.id
+UPDATE cards SET spending_limits = jsonb_build_object(
+  'daily_cap', (daily_cap * 100)::bigint,
+  'max_per_txn', (max_per_txn * 100)::bigint
+)
+Return: {
+  daily_cap: daily_cap,
+  max_per_txn: max_per_txn
+}
+
+Show full file.
+
+--- routes/cards.js → RENAME TO routes/lithic.js ---
+Lithic virtual card operations.
+supabase.from('groups') → supabase.from('cards')
+group_id → card_id
+member_ids checks → members jsonb:
+  const members = card.members || []
+  const isMember = members.includes(req.profile.id)
+  const isOwner = card.groups?.owner_id === req.user.id
+  or card.owner_id === req.user.id
+Show full file.
+
+--- routes/transactions.js ---
+supabase.from('groups') → supabase.from('cards')
+group_id → card_id
+membership checks → members jsonb pattern
+userGroups → userCards, groupIds → cardIds
+INSERT transactions: add profile_id: req.profile?.id
+Show full file.
+
+--- routes/transfers.js ---
+supabase.from('groups') → supabase.from('cards')
+group_id → card_id
+membership checks → members jsonb pattern
+Show full file.
+
+--- routes/topups.js ---
+supabase.from('groups') → supabase.from('cards')
+group_id → card_id
+membership checks → members jsonb pattern
+Show full file.
+
+--- routes/auth.js ---
+REMOVE: POST /api/auth/astra/callback entirely
+REMOVE: astraOAuthClient, ASTRA_CLIENT_ID from imports
+KEEP: GET /api/auth/verify
+KEEP: GET /api/auth/me
+
+ADD:
+
+GET /api/auth/profile:
+if (!req.profile) return 401
+const { data: kyc } = await supabase
+  .from('kyc_details')
+  .select('*')
+  .eq('profile_id', req.profile.id)
+  .single()
+return res.json({ ...req.profile, kyc: kyc || null })
+
+PUT /api/auth/profile:
+Body: { first_name, last_name, phone }
+const { data, error } = await supabase
+  .from('profiles')
+  .update({
+    first_name,
+    last_name,
+    phone,
+    updated_at: new Date().toISOString()
+  })
+  .eq('id', req.profile.id)
+  .select()
+  .single()
+return res.json(data)
+
+POST /api/auth/kyc:
+Body: {
+  first_name, last_name,
+  date_of_birth, ssn_last_four,
+  address_line1, address_line2,
+  city, state, zip, id_type
+}
+const crypto = require('crypto')
+const ssn_hash = crypto
+  .createHash('sha256')
+  .update(ssn_last_four + req.profile.id)
+  .digest('hex')
+const fingerprint = crypto
+  .createHash('sha256')
+  .update(
+    ssn_hash +
+    date_of_birth +
+    first_name.toLowerCase() +
+    last_name.toLowerCase()
+  )
+  .digest('hex')
+
+const { data: duplicate } = await supabase
+  .from('kyc_details')
+  .select('profile_id')
+  .eq('fingerprint', fingerprint)
+  .neq('profile_id', req.profile.id)
+  .single()
+if (duplicate) {
+  return res.status(409).json({
+    error: 'Identity already registered'
+  })
+}
+
+await supabase.from('kyc_details').upsert({
+  profile_id: req.profile.id,
+  fingerprint,
+  date_of_birth,
+  ssn_last_four,
+  ssn_hash,
+  address_line1,
+  address_line2: address_line2 || null,
+  city,
+  state,
+  zip,
+  id_type,
+  submitted_at: new Date().toISOString()
+}, { onConflict: 'profile_id' })
+
+await supabase.from('profiles').update({
+  first_name,
+  last_name,
+  kyc_status: 'pending',
+  kyc_submitted_at: new Date().toISOString()
+}).eq('id', req.profile.id)
+
+return res.json({ submitted: true, fingerprint })
+
+Show full file.
+
+--- routes/webhooks.js ---
+REMOVE: POST /api/webhooks/astra handler entirely
+KEEP: Lithic, Modern Treasury, Pay Theory handlers
+KEEP: verifyHMAC function untouched
+KEEP: rawBodyMiddleware untouched
+KEEP: storeWebhookEvent with event_type and processed
+UPDATE: supabase.from('groups') → supabase.from('cards')
+UPDATE: group_id → card_id in all queries
+Show full file.
+
+--- utils/ledger.js ---
+createLedgerEntry — keep exact signature:
+  { transaction_id, debit_account,
+    credit_account, amount }
+Insert ONLY these columns:
+  transaction_id, debit_account,
+  credit_account, amount, created_at
+
+Rename updateGroupBalance → updateCardBalance:
+  Parameter: card_id (not group_id)
+  supabase.from('groups') → supabase.from('cards')
+  Query transactions WHERE card_id = card_id
+  Query ledger_entries WHERE transaction_id IN (ids)
+  Compute balance from credit/debit accounts
+  UPDATE cards SET total_balance = computed_balance
+    WHERE id = card_id
+
+Export:
+module.exports = {
+  createLedgerEntry,
+  updateCardBalance,
+  updateGroupBalance: updateCardBalance
+}
+
+Show full file.
+
+--- routes/agent.js — COMPLETE REWRITE ---
+
+const express = require('express')
+const router = express.Router()
+const crypto = require('crypto')
+const jwt = require('jsonwebtoken')
+const { supabase } = require('../config/providers')
+const idempotencyMiddleware =
+  require('../middleware/idempotency')
+const { createLedgerEntry, updateCardBalance } =
+  require('../utils/ledger')
+
+HELPER: verifyAdminKey(req, res, next)
+  if (req.headers.authorization !==
+      'Bearer ' + process.env.ADMIN_KEY) {
+    return res.status(401).json({
+      error: 'Invalid admin key'
+    })
+  }
+  next()
+
+HELPER: computeRulesHash(obj)
+  const sorted = Object.keys(obj).sort()
+    .reduce((acc, k) => { acc[k]=obj[k]; return acc }, {})
+  return crypto.createHash('sha256')
+    .update(JSON.stringify(sorted)).digest('hex')
+
+HELPER: computeTokenHash(token)
+  return crypto.createHash('sha256')
+    .update(token).digest('hex')
+
+RATE TRACKER:
+const rateMap = new Map()
+function checkRate(profileId) {
+  const now = Date.now()
+  const entry = rateMap.get(profileId) ||
+    { count: 0, resetAt: now + 60000 }
+  if (now > entry.resetAt) {
+    entry.count = 0
+    entry.resetAt = now + 60000
+  }
+  entry.count++
+  rateMap.set(profileId, entry)
+  return entry.count > 10
+}
+
+MIDDLEWARE: verifyAgentToken(req, res, next)
+  Extract Bearer token from Authorization header
+  If missing: 401
+
+  let payload
+  try {
+    payload = jwt.verify(
+      token, process.env.AGENT_JWT_SECRET)
+  } catch {
+    return res.status(401).json({
+      error: 'Invalid or expired token'
+    })
+  }
+
+  const { profile_id, card_id } = payload
+  const token_hash = computeTokenHash(token)
+
+  const { data: tokenRecord } = await supabase
+    .from('agent_tokens')
+    .select('*')
+    .eq('token_hash', token_hash)
+    .single()
+
+  if (!tokenRecord)
+    return res.status(401).json({
+      error: 'Token not registered'
+    })
+  if (tokenRecord.revoked)
+    return res.status(401).json({
+      error: 'Token revoked'
+    })
+  if (new Date(tokenRecord.expires_at) < new Date())
+    return res.status(401).json({
+      error: 'Token expired'
+    })
+
+  if (req.ip !== tokenRecord.issued_from_ip) {
+    req.anomalyFlag = true
+    await supabase.from('anomaly_log').insert({
+      event_type: 'ip_mismatch',
+      severity: 'medium',
+      score: 60,
+      profile_id,
+      card_id,
+      source_ip: req.ip,
+      payload: {
+        issued_ip: tokenRecord.issued_from_ip,
+        current_ip: req.ip
+      }
+    })
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', profile_id)
+    .single()
+
+  if (!profile || profile.status !== 'active')
+    return res.status(401).json({
+      error: 'Profile suspended'
+    })
+  if (profile.kyc_status !== 'approved')
+    return res.status(401).json({
+      error: 'Agent not KYC approved'
+    })
+
+  req.agentProfileId = profile.id
+  req.agentCardId = card_id
+  req.agentProfile = profile
+  req.agentTokenHash = token_hash
+  next()
+
+MIDDLEWARE: checkAgentRules(req, res, next)
+  const { data: card } = await supabase
+    .from('cards')
+    .select('*')
+    .eq('id', req.agentCardId)
+    .single()
+
+  const amount_cents = Math.round(req.body.amount * 100)
+  const limits = card.spending_limits || {}
+  const daily_cap = limits.daily_cap || 0
+  const max_per_txn = limits.max_per_txn || 0
+
+  if (max_per_txn > 0 && amount_cents > max_per_txn) {
+    await supabase.from('agent_spend_log').insert({
+      profile_id: req.agentProfileId,
+      card_id: req.agentCardId,
+      amount: amount_cents,
+      status: 'blocked',
+      block_reason: 'per_txn_cap'
+    })
+    await supabase.from('anomaly_log').insert({
+      event_type: 'rule_breach',
+      severity: 'high',
+      score: 75,
+      profile_id: req.agentProfileId,
+      card_id: req.agentCardId,
+      payload: { reason: 'per_txn_cap', amount_cents }
+    })
+    return res.status(403).json({
+      error: 'Exceeds per-transaction cap',
+      cap_dollars: max_per_txn / 100
+    })
+  }
+
+  const todayStart = new Date()
+  todayStart.setUTCHours(0,0,0,0)
+  const { data: todayRows } = await supabase
+    .from('agent_spend_log')
+    .select('amount')
+    .eq('profile_id', req.agentProfileId)
+    .eq('status', 'approved')
+    .gte('created_at', todayStart.toISOString())
+  const todayTotal = (todayRows||[])
+    .reduce((sum, r) => sum + r.amount, 0)
+
+  if (daily_cap > 0 &&
+      (todayTotal + amount_cents) > daily_cap) {
+    await supabase.from('agent_spend_log').insert({
+      profile_id: req.agentProfileId,
+      card_id: req.agentCardId,
+      amount: amount_cents,
+      status: 'blocked',
+      block_reason: 'daily_cap'
+    })
+    await supabase.from('anomaly_log').insert({
+      event_type: 'rule_breach',
+      severity: 'high',
+      score: 75,
+      profile_id: req.agentProfileId,
+      card_id: req.agentCardId,
+      payload: { reason: 'daily_cap', amount_cents }
+    })
+    return res.status(403).json({
+      error: 'Daily spend cap reached',
+      cap_dollars: daily_cap / 100
+    })
+  }
+
+  if (card.blocked_mcc?.includes(req.body.mcc)) {
+    await supabase.from('agent_spend_log').insert({
+      profile_id: req.agentProfileId,
+      card_id: req.agentCardId,
+      amount: amount_cents,
+      status: 'blocked',
+      block_reason: 'mcc_blocked'
+    })
+    return res.status(403).json({
+      error: 'MCC not allowed'
+    })
+  }
+
+  req.agentCard = card
+  next()
+
+MIDDLEWARE: anomalyDetection(req, res, next)
+  const isSpike = checkRate(req.agentProfileId)
+  if (isSpike) {
+    req.anomalyFlag = true
+    await supabase.from('anomaly_log').insert({
+      event_type: 'rate_spike',
+      severity: 'medium',
+      score: 60,
+      profile_id: req.agentProfileId,
+      card_id: req.agentCardId,
+      source_ip: req.ip
+    })
+  }
+
+  const sevenDaysAgo = new Date(
+    Date.now() - 7*24*60*60*1000).toISOString()
+  const { data: recentLogs } = await supabase
+    .from('anomaly_log')
+    .select('source_ip')
+    .eq('profile_id', req.agentProfileId)
+    .gte('created_at', sevenDaysAgo)
+  const knownIPs = (recentLogs||[])
+    .map(r => r.source_ip).filter(Boolean)
+  if (!knownIPs.includes(req.ip)) {
+    req.anomalyFlag = true
+    await supabase.from('anomaly_log').insert({
+      event_type: 'new_ip',
+      severity: 'medium',
+      score: 40,
+      profile_id: req.agentProfileId,
+      card_id: req.agentCardId,
+      source_ip: req.ip,
+      payload: { ip: req.ip }
+    })
+  }
+  next()
+
+POST /api/agent/register:
+Auth: verifyAdminKey
+Body: {
+  card_id, agent_name, model_name,
+  model_version, system_prompt, owner_auth_id
+}
+const { data: owner } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('auth_id', owner_auth_id)
+  .single()
+if (!owner) return 404 { error: 'Owner not found' }
+
+const system_prompt_hash = crypto
+  .createHash('sha256')
+  .update(system_prompt)
+  .digest('hex')
+const fingerprint = crypto
+  .createHash('sha256')
+  .update(model_name + (model_version||'') +
+    system_prompt_hash + owner.id)
+  .digest('hex')
+
+const { data: existingKyc } = await supabase
+  .from('kyc_details')
+  .select('profile_id')
+  .eq('fingerprint', fingerprint)
+  .single()
+if (existingKyc) {
+  return res.json({
+    profile_id: existingKyc.profile_id,
+    existing: true
+  })
+}
+
+const { data: agentProfile } = await supabase
+  .from('profiles')
+  .insert({
+    type: 'agent',
+    first_name: agent_name,
+    model_name,
+    model_version: model_version || null,
+    system_prompt_hash,
+    owner_id: owner.id,
+    kyc_status: 'pending',
+    status: 'active',
+    current_ip: req.ip
+  })
+  .select()
+  .single()
+
+await supabase.from('kyc_details').insert({
+  profile_id: agentProfile.id,
+  fingerprint,
+  intended_use: 'autonomous payment agent',
+  risk_level: 'medium'
+})
+
+await supabase.from('cards').update({
+  members: supabase.raw(
+    `members || jsonb_build_array('${agentProfile.id}'::text)`
+  )
+}).eq('id', card_id)
+
+return res.json({
+  profile_id: agentProfile.id,
+  fingerprint,
+  kyc_status: 'pending'
+})
+
+POST /api/agent/kyc/approve:
+Auth: verifyAdminKey
+Body: { profile_id, risk_level, notes }
+Fetch profile, verify type='agent' → 400
+UPDATE profiles SET kyc_status:'approved',
+  kyc_approved_at: now()
+UPDATE kyc_details SET
+  risk_level: risk_level || 'medium',
+  reviewed_at: now()
+Return: { approved: true, profile_id }
+
+POST /api/agent/kyc/suspend:
+Auth: verifyAdminKey
+Body: { profile_id, reason }
+UPDATE profiles SET status:'suspended',
+  kyc_status:'suspended',
+  suspension_reason: reason
+UPDATE agent_tokens SET revoked=true
+  WHERE profile_id=profile_id
+INSERT anomaly_log:
+  event_type:'agent_suspended'
+  severity:'high', score:100
+  profile_id, payload:{ reason }
+Return: { suspended: true }
+
+POST /api/agent/token:
+Auth: verifyAdminKey
+Body: { profile_id }
+Fetch profile WHERE id=profile_id
+Check type='agent' → 403
+Check kyc_status='approved' → 403
+Check status='active' → 403
+
+Find card:
+const { data: card } = await supabase
+  .from('cards')
+  .select('*')
+  .filter('members', 'cs',
+    JSON.stringify([profile_id]))
+  .single()
+if (!card) return 404 { error: 'No card found for agent' }
+
+const token = jwt.sign(
+  { profile_id, card_id: card.id, type: 'agent' },
+  process.env.AGENT_JWT_SECRET,
+  { expiresIn: '1h' }
+)
+const token_hash = computeTokenHash(token)
+const expires_at = new Date(
+  Date.now() + 3600000).toISOString()
+
+await supabase.from('agent_tokens').insert({
+  profile_id,
+  card_id: card.id,
+  token_hash,
+  expires_at,
+  rules_hash: computeRulesHash(
+    card.spending_limits || {}),
+  issued_from_ip: req.ip,
+  revoked: false
+})
+
+return res.json({ token, expires_at, profile_id })
+
+POST /api/agent/pay:
+Middleware: idempotencyMiddleware, verifyAgentToken,
+            checkAgentRules, anomalyDetection
+Body: { amount, merchant_name, mcc, memo, idempotency_key }
+
+const amount_cents = Math.round(req.body.amount * 100)
+const card = req.agentCard
+
+if (card.total_balance < amount_cents) {
+  return res.status(402).json({
+    error: 'Insufficient balance'
+  })
+}
+
+Determine provider:
+let provider = 'paytheory'
+if (process.env.PROVIDER_STRIPE === 'true')
+  provider = 'stripe'
+else if (process.env.PROVIDER_ISSUING === 'lithic')
+  provider = 'lithic'
+else if (process.env.PROVIDER_BANK_RAILS === 'modern_treasury')
+  provider = 'modern_treasury'
+
+Execute provider — same logic as existing pay routes.
+Store provider_ref from response.
+
+const { data: transaction } = await supabase
+  .from('transactions')
+  .insert({
+    card_id: req.agentCardId,
+    profile_id: req.agentProfileId,
+    user_id: null,
+    type: 'agent_payment',
+    amount: amount_cents,
+    description: req.body.memo || 'Agent payment',
+    status: 'completed',
+    merchant_name: req.body.merchant_name || null,
+    mcc: req.body.mcc || null,
+    payment_method: provider
+  })
+  .select()
+  .single()
+
+await createLedgerEntry({
+  transaction_id: transaction.id,
+  debit_account: 'expenses',
+  credit_account: 'cash',
+  amount: amount_cents
+})
+
+await updateCardBalance(req.agentCardId)
+
+await supabase.from('agent_spend_log').insert({
+  profile_id: req.agentProfileId,
+  card_id: req.agentCardId,
+  token_hash: req.agentTokenHash,
+  amount: amount_cents,
+  merchant_name: req.body.merchant_name || null,
+  mcc: req.body.mcc || null,
+  memo: req.body.memo || null,
+  status: 'approved',
+  provider,
+  anomaly_flag: req.anomalyFlag || false
+})
+
+await supabase.from('profiles').update({
+  last_seen: new Date().toISOString(),
+  current_ip: req.ip
+}).eq('id', req.agentProfileId)
+
+return res.json({
+  approved: true,
+  amount_dollars: amount_cents / 100,
+  provider,
+  provider_ref,
+  transaction_id: transaction.id,
+  anomaly_flagged: req.anomalyFlag || false
+})
+
+POST /api/agent/spend-log:
+Auth: verifyAdminKey
+Body: { card_id, limit=50, offset=0 }
+Query agent_spend_log WHERE card_id
+  ORDER BY created_at DESC
+  LIMIT limit OFFSET offset
+For each row fetch profile and kyc_details
+Return: {
+  data: rows.map(r => ({
+    ...r,
+    amount_dollars: r.amount / 100,
+    agent_name: profile.first_name,
+    model_name: profile.model_name,
+    fingerprint: kyc.fingerprint
+  })),
+  total_count,
+  limit,
+  offset
+}
+
+GET /api/agent/audit?card_id=xxx:
+Auth: verifyAdminKey
+Fetch all agent_spend_log WHERE card_id
+Fetch all profiles and kyc_details for those profile_ids
+Group by profile_id in JavaScript
+Return array of:
+{
+  profile_id,
+  agent_name: profile.first_name,
+  model_name: profile.model_name,
+  model_version: profile.model_version,
+  fingerprint: kyc.fingerprint,
+  kyc_status: profile.kyc_status,
+  risk_level: kyc.risk_level,
+  total_spent_dollars: sum of approved amounts / 100,
+  transaction_count: count of approved,
+  blocked_count: count of blocked,
+  anomaly_count: count where anomaly_flag=true,
+  last_seen: max created_at,
+  flagged: blocked_count > 2 || anomaly_count > 1
+}
+
+GET /api/agent/list?card_id=xxx:
+Auth: verifyAdminKey
+const { data: card } = await supabase
+  .from('cards')
+  .select('members')
+  .eq('id', card_id)
+  .single()
+const memberIds = card.members || []
+const agentIds = memberIds
+
+Fetch profiles WHERE type='agent'
+  AND id IN agentIds
+Join kyc_details for each
+Return full profiles with kyc.
+
+GET /api/agent/risk?card_id=xxx:
+Auth: verifyAdminKey
+const { data: card } = await supabase
+  .from('cards')
+  .select('members')
+  .eq('id', card_id)
+  .single()
+const memberIds = card.members || []
+
+SELECT * FROM profile_risk_scores
+WHERE profile_id::text = ANY(memberIds)
+ORDER BY total_risk_score DESC
+Return ranked list.
+
+POST /api/agent/revoke:
+Auth: verifyAdminKey
+Body: { token_hash }
+UPDATE agent_tokens SET revoked=true
+  WHERE token_hash=token_hash
+Return: { revoked: true }
+
+module.exports = router
+
+=== FINAL CHECKLIST — confirm each after writing ===
+1. Zero supabase.from('groups') anywhere
+2. Zero group_id references anywhere
+3. Zero Astra references anywhere
+4. /api/cards mounts routes/cards.js
+5. /api/lithic mounts routes/lithic.js
+6. cards.members used for ALL membership checks
+7. req.profile.id used for human membership
+8. req.agentProfileId used for agent identity
+9. updateCardBalance exported from utils/ledger.js
+   with updateGroupBalance as alias
+10. authMiddleware creates profiles row on first login
+11. Zero agent_rules references
+12. Zero users_extended references
+13. Zero member_ids references
+14. Zero agent_ids references
+15. transactions.user_id = null for agent payments
+16. transactions.profile_id set for all payments
+17. spending_limits uses daily_cap and max_per_txn only
+18. invite_code generated with crypto.randomBytes(6)
+19. POST /api/cards/join uses invite_code field
+20. All amounts divided by 100 when returned to caller
+
+Show every modified file in full.
+Add // MODIFIED: [date] at top of changed files.
+Add // RENAMED: [date] at top of renamed files.
+Confirm checklist one item at a time after all files.
