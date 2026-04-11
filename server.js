@@ -25,7 +25,7 @@ const authMiddleware = async (req, res, next) => {
 
 // Public routes that don't require authentication
 // Note: /api/auth/astra/callback requires auth but is handled in the route itself
-const publicRoutes = ['/health', '/api/webhooks'];
+const publicRoutes = ['/health', '/api/webhooks', '/api/agent'];
 
 // Apply auth middleware globally except for public routes
 app.use((req, res, next) => {
@@ -45,6 +45,7 @@ const cardsRoutes = require('./routes/cards');
 const transfersRoutes = require('./routes/transfers');
 const topupsRoutes = require('./routes/topups');
 const webhooksRoutes = require('./routes/webhooks');
+const agentRoutes = require('./routes/agent');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -54,6 +55,7 @@ app.use('/api/cards', cardsRoutes);
 app.use('/api/transfers', transfersRoutes);
 app.use('/api/topups', topupsRoutes);
 app.use('/api/webhooks', webhooksRoutes);
+app.use('/api/agent', agentRoutes);
 
 // Legacy routes for backward compatibility
 // These routes are kept for backward compatibility but use the new route handlers
@@ -161,7 +163,16 @@ app.get('/api/astra/test', authMiddleware, async (req, res) => {
 });
 
 // ========= HEALTH =========
-app.get('/health', (req, res) => res.json({ status: 'POOLY BACKEND LIVE', time: new Date() }));
+app.get('/health', (req, res) => res.json({
+  status: 'POOLY BACKEND LIVE',
+  time: new Date(),
+  providers: {
+    issuing: process.env.PROVIDER_ISSUING || 'lithic',
+    bank_rails: process.env.PROVIDER_BANK_RAILS || 'modern_treasury',
+    acquiring: process.env.PROVIDER_ACQUIRING || 'paytheory',
+    stripe_enabled: process.env.PROVIDER_STRIPE === 'true'
+  }
+}));
 
 // ========= TEST AUTH ROUTE =========
 app.get('/api/test-auth', async (req, res) => {

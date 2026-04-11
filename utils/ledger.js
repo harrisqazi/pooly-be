@@ -1,53 +1,29 @@
-// Double-entry ledger utilities
+// MODIFIED: 2026-04-11 — fix createLedgerEntry to match actual ledger_entries schema
 const { supabase } = require('../config/providers');
 
 /**
  * Create a double-entry ledger entry
- * @param {Object} params
- * @param {string} params.group_id - Group ID
- * @param {string} params.transaction_id - Transaction ID (optional)
- * @param {string} params.debit_account - Account to debit
- * @param {string} params.credit_account - Account to credit
- * @param {number} params.amount - Amount in cents
- * @param {string} params.description - Description
- * @param {Object} params.metadata - Additional metadata
+ * Inserts ONE row per call using the confirmed schema:
+ *   id, transaction_id, debit_account, credit_account, amount, created_at
+ * amount must be in CENTS (bigint)
  */
 async function createLedgerEntry({
-  group_id,
   transaction_id = null,
   debit_account,
   credit_account,
-  amount,
-  description,
-  metadata = {}
+  amount
 }) {
-  const entries = [
-    {
-      group_id,
-      transaction_id,
-      account: debit_account,
-      type: 'debit',
-      amount,
-      description,
-      metadata,
-      created_at: new Date().toISOString()
-    },
-    {
-      group_id,
-      transaction_id,
-      account: credit_account,
-      type: 'credit',
-      amount,
-      description,
-      metadata,
-      created_at: new Date().toISOString()
-    }
-  ];
-
   const { data, error } = await supabase
     .from('ledger_entries')
-    .insert(entries)
-    .select();
+    .insert({
+      transaction_id,
+      debit_account,
+      credit_account,
+      amount,
+      created_at: new Date().toISOString()
+    })
+    .select()
+    .single();
 
   if (error) {
     throw new Error(`Ledger entry failed: ${error.message}`);
@@ -58,26 +34,42 @@ async function createLedgerEntry({
 
 /**
  * Update group balance based on ledger entries
+ * Computes: SUM(credit_account amounts) - SUM(debit_account amounts)
+ * where cash appears as credit_account = incoming funds
  * @param {string} group_id - Group ID
  */
 async function updateGroupBalance(group_id) {
-  const { data: entries, error } = await supabase
-    .from('ledger_entries')
-    .select('type, amount')
+  const { data: transactions, error: txError } = await supabase
+    .from('transactions')
+    .select('id')
     .eq('group_id', group_id);
 
-  if (error) {
-    throw new Error(`Failed to fetch ledger entries: ${error.message}`);
+  if (txError) {
+    throw new Error(`Failed to fetch transactions: ${txError.message}`);
   }
 
+  const txIds = (transactions || []).map(t => t.id);
+
   let balance = 0;
-  entries.forEach(entry => {
-    if (entry.type === 'debit') {
-      balance += entry.amount;
-    } else {
-      balance -= entry.amount;
+
+  if (txIds.length > 0) {
+    const { data: entries, error } = await supabase
+      .from('ledger_entries')
+      .select('debit_account, credit_account, amount')
+      .in('transaction_id', txIds);
+
+    if (error) {
+      throw new Error(`Failed to fetch ledger entries: ${error.message}`);
     }
-  });
+
+    (entries || []).forEach(entry => {
+      if (entry.credit_account === 'cash') {
+        balance += Number(entry.amount);
+      } else if (entry.debit_account === 'cash') {
+        balance -= Number(entry.amount);
+      }
+    });
+  }
 
   const { error: updateError } = await supabase
     .from('groups')

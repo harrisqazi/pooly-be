@@ -86,6 +86,11 @@ const TEST_ACCOUNTS = {
   astra: process.env.ASTRA_TEST_ACCOUNT_ID || 'astra_test_account_123'
 };
 
+// Stripe (optional — only initialized when PROVIDER_STRIPE=true)
+const stripe = process.env.PROVIDER_STRIPE === 'true'
+  ? require('stripe')(process.env.STRIPE_SECRET_KEY)
+  : null;
+
 module.exports = {
   supabase,
   lithic,
@@ -93,6 +98,7 @@ module.exports = {
   payTheoryClient,
   astraClient,
   astraOAuthClient,
+  stripe,
   ASTRA_CLIENT_ID,
   ASTRA_CLIENT_SECRET,
   PROVIDER_ISSUING,

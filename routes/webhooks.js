@@ -1,4 +1,6 @@
-// Webhooks routes - raw-body/HMAC/dedupe for all providers
+// MODIFIED: 2026-04-11 — fix storeWebhookEvent to match confirmed schema,
+//   add event_type + processed=true on success, anomaly_log on HMAC fail,
+//   console.log at top of each handler, always 200 on signature failure
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
@@ -38,15 +40,27 @@ async function isDuplicate(provider, eventId) {
 /**
  * Store webhook event for deduplication
  */
-async function storeWebhookEvent(provider, eventId, payload) {
+async function storeWebhookEvent(provider, eventId, event) {
   await supabase
     .from('webhook_events')
     .insert({
       provider,
       event_id: eventId,
-      payload,
-      processed_at: new Date().toISOString()
+      event_type: event.type || 'unknown',
+      payload: event,
+      processed: false
     });
+}
+
+/**
+ * Mark a webhook event as processed
+ */
+async function markProcessed(provider, eventId) {
+  await supabase
+    .from('webhook_events')
+    .update({ processed: true })
+    .eq('provider', provider)
+    .eq('event_id', eventId);
 }
 
 /**
@@ -54,6 +68,7 @@ async function storeWebhookEvent(provider, eventId, payload) {
  * POST /api/webhooks/lithic
  */
 router.post('/lithic', rawBodyMiddleware, async (req, res) => {
+  const provider = 'lithic';
   try {
     const signature = req.headers['lithic-signature'] || req.headers['x-lithic-signature'];
     const webhookSecret = process.env.LITHIC_WEBHOOK_SECRET || 'lithic_webhook_secret';
@@ -61,23 +76,28 @@ router.post('/lithic', rawBodyMiddleware, async (req, res) => {
     // Verify HMAC if secret is configured
     if (webhookSecret && webhookSecret !== 'lithic_webhook_secret') {
       if (!signature || !verifyHMAC(signature, webhookSecret, req.body)) {
-        return res.status(401).json({ error: 'Invalid signature' });
+        await supabase.from('anomaly_log').insert({
+          event_type: 'bad_webhook',
+          payload: { provider, source_ip: req.ip, reason: 'hmac_mismatch' }
+        });
+        return res.status(200).json({ received: true, error: 'invalid signature' });
       }
     }
 
     const event = JSON.parse(req.body.toString());
     const eventId = event.event_id || event.id || `${Date.now()}-${Math.random()}`;
 
+    console.log(`[WEBHOOK] source=${provider} | event=${event.type || 'unknown'} | id=${eventId} | ip=${req.ip}`);
+
     // Deduplicate
-    if (await isDuplicate('lithic', eventId)) {
+    if (await isDuplicate(provider, eventId)) {
       return res.json({ received: true, duplicate: true });
     }
 
-    await storeWebhookEvent('lithic', eventId, event);
+    await storeWebhookEvent(provider, eventId, event);
 
     // Handle different event types
     if (event.type === 'card.created' || event.type === 'card.updated') {
-      // Update card in database
       if (event.data?.token) {
         await supabase
           .from('cards')
@@ -89,7 +109,6 @@ router.post('/lithic', rawBodyMiddleware, async (req, res) => {
           .eq('lithic_card_token', event.data.token);
       }
     } else if (event.type === 'transaction.settled' || event.type === 'transaction.authorization') {
-      // Update transaction status
       if (event.data?.card_token) {
         const { data: card } = await supabase
           .from('cards')
@@ -98,7 +117,6 @@ router.post('/lithic', rawBodyMiddleware, async (req, res) => {
           .single();
 
         if (card) {
-          // Create or update transaction
           const { data: existingTx } = await supabase
             .from('transactions')
             .select('*')
@@ -121,16 +139,12 @@ router.post('/lithic', rawBodyMiddleware, async (req, res) => {
               });
           }
 
-          // Update balance if settled
           if (event.type === 'transaction.settled') {
             await createLedgerEntry({
-              group_id: card.group_id,
               transaction_id: existingTx?.id || null,
               debit_account: 'expenses',
               credit_account: 'cards',
-              amount: event.data.amount ? event.data.amount / 100 : 0,
-              description: event.data.merchant?.name || 'Card transaction',
-              metadata: { provider: 'lithic', transaction_id: event.data.token }
+              amount: event.data.amount || 0
             });
             await updateGroupBalance(card.group_id);
           }
@@ -138,6 +152,7 @@ router.post('/lithic', rawBodyMiddleware, async (req, res) => {
       }
     }
 
+    await markProcessed(provider, eventId);
     res.json({ received: true });
   } catch (error) {
     console.error('Lithic webhook error:', error);
@@ -150,28 +165,32 @@ router.post('/lithic', rawBodyMiddleware, async (req, res) => {
  * POST /api/webhooks/modern-treasury
  */
 router.post('/modern-treasury', rawBodyMiddleware, async (req, res) => {
+  const provider = 'modern_treasury';
   try {
     const signature = req.headers['x-signature'] || req.headers['modern-treasury-signature'];
     const webhookSecret = process.env.MODERN_TREASURY_WEBHOOK_SECRET || 'mt_webhook_secret';
 
-    // Verify HMAC if secret is configured
     if (webhookSecret && webhookSecret !== 'mt_webhook_secret') {
       if (!signature || !verifyHMAC(signature, webhookSecret, req.body)) {
-        return res.status(401).json({ error: 'Invalid signature' });
+        await supabase.from('anomaly_log').insert({
+          event_type: 'bad_webhook',
+          payload: { provider, source_ip: req.ip, reason: 'hmac_mismatch' }
+        });
+        return res.status(200).json({ received: true, error: 'invalid signature' });
       }
     }
 
     const event = JSON.parse(req.body.toString());
     const eventId = event.id || event.event_id || `${Date.now()}-${Math.random()}`;
 
-    // Deduplicate
-    if (await isDuplicate('modern_treasury', eventId)) {
+    console.log(`[WEBHOOK] source=${provider} | event=${event.type || 'unknown'} | id=${eventId} | ip=${req.ip}`);
+
+    if (await isDuplicate(provider, eventId)) {
       return res.json({ received: true, duplicate: true });
     }
 
-    await storeWebhookEvent('modern_treasury', eventId, event);
+    await storeWebhookEvent(provider, eventId, event);
 
-    // Handle payment order updates
     if (event.object === 'payment_order' || event.type === 'payment_order.updated') {
       const paymentOrder = event.data || event;
       const { data: transfer } = await supabase
@@ -181,7 +200,6 @@ router.post('/modern-treasury', rawBodyMiddleware, async (req, res) => {
         .single();
 
       if (transfer) {
-        // Update transfer status
         await supabase
           .from('transfers')
           .update({
@@ -190,22 +208,19 @@ router.post('/modern-treasury', rawBodyMiddleware, async (req, res) => {
           })
           .eq('id', transfer.id);
 
-        // If completed and credit, update balance
         if (paymentOrder.status === 'posted' && transfer.direction === 'credit') {
           await createLedgerEntry({
-            group_id: transfer.group_id,
             transaction_id: null,
             debit_account: 'cash',
             credit_account: 'external',
-            amount: transfer.amount,
-            description: transfer.description || 'Transfer',
-            metadata: { transfer_id: transfer.id, provider: 'modern_treasury' }
+            amount: transfer.amount
           });
           await updateGroupBalance(transfer.group_id);
         }
       }
     }
 
+    await markProcessed(provider, eventId);
     res.json({ received: true });
   } catch (error) {
     console.error('Modern Treasury webhook error:', error);
@@ -218,28 +233,32 @@ router.post('/modern-treasury', rawBodyMiddleware, async (req, res) => {
  * POST /api/webhooks/paytheory
  */
 router.post('/paytheory', rawBodyMiddleware, async (req, res) => {
+  const provider = 'paytheory';
   try {
     const signature = req.headers['x-paytheory-signature'] || req.headers['paytheory-signature'];
     const webhookSecret = process.env.PAY_THEORY_WEBHOOK_SECRET || 'pt_webhook_secret';
 
-    // Verify HMAC if secret is configured
     if (webhookSecret && webhookSecret !== 'pt_webhook_secret') {
       if (!signature || !verifyHMAC(signature, webhookSecret, req.body)) {
-        return res.status(401).json({ error: 'Invalid signature' });
+        await supabase.from('anomaly_log').insert({
+          event_type: 'bad_webhook',
+          payload: { provider, source_ip: req.ip, reason: 'hmac_mismatch' }
+        });
+        return res.status(200).json({ received: true, error: 'invalid signature' });
       }
     }
 
     const event = JSON.parse(req.body.toString());
     const eventId = event.id || event.event_id || `${Date.now()}-${Math.random()}`;
 
-    // Deduplicate
-    if (await isDuplicate('paytheory', eventId)) {
+    console.log(`[WEBHOOK] source=${provider} | event=${event.type || 'unknown'} | id=${eventId} | ip=${req.ip}`);
+
+    if (await isDuplicate(provider, eventId)) {
       return res.json({ received: true, duplicate: true });
     }
 
-    await storeWebhookEvent('paytheory', eventId, event);
+    await storeWebhookEvent(provider, eventId, event);
 
-    // Handle top-up updates
     if (event.type === 'topup.completed' || event.type === 'topup.failed') {
       const { data: topup } = await supabase
         .from('topups')
@@ -258,6 +277,7 @@ router.post('/paytheory', rawBodyMiddleware, async (req, res) => {
       }
     }
 
+    await markProcessed(provider, eventId);
     res.json({ received: true });
   } catch (error) {
     console.error('Pay Theory webhook error:', error);
@@ -270,28 +290,32 @@ router.post('/paytheory', rawBodyMiddleware, async (req, res) => {
  * POST /api/webhooks/astra
  */
 router.post('/astra', rawBodyMiddleware, async (req, res) => {
+  const provider = 'astra';
   try {
     const signature = req.headers['x-astra-signature'] || req.headers['astra-signature'];
     const webhookSecret = process.env.ASTRA_WEBHOOK_SECRET || 'astra_webhook_secret';
 
-    // Verify HMAC if secret is configured
     if (webhookSecret && webhookSecret !== 'astra_webhook_secret') {
       if (!signature || !verifyHMAC(signature, webhookSecret, req.body)) {
-        return res.status(401).json({ error: 'Invalid signature' });
+        await supabase.from('anomaly_log').insert({
+          event_type: 'bad_webhook',
+          payload: { provider, source_ip: req.ip, reason: 'hmac_mismatch' }
+        });
+        return res.status(200).json({ received: true, error: 'invalid signature' });
       }
     }
 
     const event = JSON.parse(req.body.toString());
     const eventId = event.id || event.event_id || `${Date.now()}-${Math.random()}`;
 
-    // Deduplicate
-    if (await isDuplicate('astra', eventId)) {
+    console.log(`[WEBHOOK] source=${provider} | event=${event.type || 'unknown'} | id=${eventId} | ip=${req.ip}`);
+
+    if (await isDuplicate(provider, eventId)) {
       return res.json({ received: true, duplicate: true });
     }
 
-    await storeWebhookEvent('astra', eventId, event);
+    await storeWebhookEvent(provider, eventId, event);
 
-    // Handle transfer updates
     if (event.type === 'transfer.completed' || event.type === 'transfer.failed') {
       const { data: transfer } = await supabase
         .from('transfers')
@@ -310,6 +334,7 @@ router.post('/astra', rawBodyMiddleware, async (req, res) => {
       }
     }
 
+    await markProcessed(provider, eventId);
     res.json({ received: true });
   } catch (error) {
     console.error('Astra webhook error:', error);
