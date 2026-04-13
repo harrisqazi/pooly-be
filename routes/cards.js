@@ -68,7 +68,7 @@ router.post('/', async (req, res) => {
         card_name: card_name || name,
         description: description || null,
         owner_id: req.user.id,
-        members: JSON.stringify([req.profile.id]),
+        members: [req.profile.id],
         total_balance: 0,
         spending_limits: { daily_cap: 0, max_per_txn: 0 },
         invite_code,

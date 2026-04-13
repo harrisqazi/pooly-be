@@ -1137,6 +1137,19 @@ ORDER BY total_risk_score DESC;`)
 
   // TEST 15 — Create card
   await runTest(15, 'Create card', async (attempt, testKey) => {
+    // Clean up duplicate test cards from previous failed attempts
+    log('Cleaning up duplicate test cards...')
+    const { error: cleanupError } = await supabase
+      .from('cards')
+      .delete()
+      .eq('name', 'Test Card')
+      .eq('owner_id', '79ad6c1b-d44d-4470-98e1-be337e519999')
+    if (cleanupError) {
+      log('Cleanup warning: ' + cleanupError.message)
+    } else {
+      log('Cleanup done')
+    }
+
     const res = await axios.post(
       BASE_URL + '/api/cards',
       {
@@ -1147,10 +1160,17 @@ ORDER BY total_risk_score DESC;`)
       { headers: { Authorization: 'Bearer ' + USER_JWT },
         validateStatus: () => true }
     )
+
+    const membersArray = Array.isArray(res.data?.members)
+      ? res.data.members
+      : (typeof res.data?.members === 'string'
+        ? JSON.parse(res.data.members)
+        : [])
+
     const pass = !!res.data?.id &&
                  !!res.data?.invite_code &&
-                 Array.isArray(res.data?.members) &&
-                 res.data.members.includes(USER_PROFILE_ID)
+                 membersArray.includes(USER_PROFILE_ID)
+
     if (pass) {
       USER_CARD_ID = res.data.id
       USER_INVITE_CODE = res.data.invite_code
@@ -1160,6 +1180,7 @@ ORDER BY total_risk_score DESC;`)
       log('POST /api/cards response: ' +
         JSON.stringify(res.data))
       log('USER_PROFILE_ID: ' + USER_PROFILE_ID)
+      log('members parsed: ' + JSON.stringify(membersArray))
       if (!USER_PROFILE_ID) {
         log('USER_PROFILE_ID not set — TEST 12 must pass first')
         writeLog()
