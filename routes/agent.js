@@ -460,46 +460,22 @@ router.post('/pay', idempotencyMiddleware, verifyAgentToken, checkAgentRules, an
       return res.status(402).json({ error: 'Insufficient balance' });
     }
 
-    let provider = 'paytheory';
-    if (process.env.PROVIDER_STRIPE === 'true') provider = 'stripe';
-    else if (process.env.PROVIDER_ISSUING === 'lithic') provider = 'lithic';
-    else if (process.env.PROVIDER_BANK_RAILS === 'modern_treasury') provider = 'modern_treasury';
-
-    let provider_ref;
-
-    if (provider === 'lithic') {
-      if (!card.card_token) return res.status(400).json({ error: 'Card has no Lithic card token' });
-      const { lithic } = require('../config/providers');
-      await lithic.cards.retrieve(card.card_token);
-      provider_ref = card.card_token + '_agent_' + Date.now();
-
-    } else if (provider === 'modern_treasury') {
-      const { modernTreasuryClient } = require('../config/providers');
-      const mtResp = await modernTreasuryClient.post('/payment_orders', {
-        amount: amount_cents,
-        direction: 'debit',
-        currency: 'USD',
-        description: req.body.memo || 'Agent payment'
-      });
-      provider_ref = mtResp.data.id;
-
-    } else if (provider === 'paytheory') {
-      const { payTheoryClient } = require('../config/providers');
-      const ptResp = await payTheoryClient.post('/charges', {
-        amount: amount_cents,
-        description: req.body.memo || 'Agent payment'
-      });
-      provider_ref = ptResp.data.id;
-
-    } else if (provider === 'stripe') {
-      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-      const pi = await stripe.paymentIntents.create({
-        amount: amount_cents,
-        currency: 'usd',
-        metadata: { card_id: req.agentCardId, memo: req.body.memo || '', token_hash: req.agentTokenHash }
-      });
-      provider_ref = pi.id;
+    // Lithic is ALWAYS the spending provider.
+    // Stripe / Modern Treasury / Pay Theory are only for loading money IN (topups/deposits).
+    if (!card.card_token) {
+      return res.status(400).json({ error: 'Card has no Lithic card token' });
     }
+
+    const { lithic } = require('../config/providers');
+
+    // Verify card is active in Lithic (sandbox: no direct charge API — real charges come via merchant terminals / webhooks)
+    const lithicCard = await lithic.cards.retrieve(card.card_token);
+    if (lithicCard.state !== 'OPEN') {
+      return res.status(403).json({ error: 'Card is not active', state: lithicCard.state });
+    }
+
+    const provider = 'lithic';
+    const provider_ref = card.card_token + '_agent_txn_' + Date.now();
 
     const { data: transaction, error: txError } = await supabase
       .from('transactions')

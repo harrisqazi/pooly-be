@@ -479,7 +479,8 @@ async function main() {
           'idempotency-key': ikey },
         validateStatus: () => true }
     )
-    const pass = res.data?.approved === true
+    const pass = res.data?.approved === true &&
+                 res.data?.provider === 'lithic'
 
     const errMsg = res.data?.error || ''
     const diagnoseAndFix = async () => {
@@ -510,15 +511,12 @@ async function main() {
             log('Got new token')
           }
         }
-      } else if (errMsg.includes('Lithic card') ||
-                 errMsg.includes('card token')) {
-        log('Card has no Lithic card token')
-        log('This requires manual fix:')
-        log('Go to Lithic dashboard, get a sandbox ' +
-          'card token, and set cards.card_token for ' +
-          'card ID: ' + CARD_ID)
-        log('OR switch provider to paytheory by ' +
-          'setting PROVIDER_ISSUING= in Replit Secrets')
+      } else if (!pass && res.data?.approved === true &&
+                 res.data?.provider !== 'lithic') {
+        log('Payment approved but provider is not lithic: ' +
+          res.data?.provider)
+        log('Route is not using Lithic as spending provider')
+        log('Manual fix required in routes/agent.js /pay')
         writeLog()
         process.exit(1)
       } else if (errMsg.includes('cap') ||

@@ -153,10 +153,10 @@ app.get('/health', (req, res) => res.json({
   status: 'POOLY BACKEND LIVE',
   time: new Date(),
   providers: {
-    issuing: process.env.PROVIDER_ISSUING || 'lithic',
+    card_issuer: 'lithic',
     bank_rails: process.env.PROVIDER_BANK_RAILS || 'modern_treasury',
     acquiring: process.env.PROVIDER_ACQUIRING || 'paytheory',
-    stripe_enabled: process.env.PROVIDER_STRIPE === 'true'
+    stripe_deposits: process.env.PROVIDER_STRIPE === 'true'
   }
 }));
 

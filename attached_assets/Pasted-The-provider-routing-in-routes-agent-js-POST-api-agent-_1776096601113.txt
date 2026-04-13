@@ -1,0 +1,76 @@
+The provider routing in routes/agent.js POST /api/agent/pay 
+is architecturally wrong and needs to be fixed.
+
+CURRENT WRONG BEHAVIOR:
+The endpoint uses PROVIDER_STRIPE, PROVIDER_ISSUING, 
+PROVIDER_BANK_RAILS flags to decide which provider 
+executes the payment. This is incorrect.
+
+CORRECT ARCHITECTURE:
+Lithic is ALWAYS the spending provider. It issues the 
+virtual card and processes all card spending.
+Stripe and Modern Treasury are ONLY for loading money 
+INTO the card (deposits/topups). They are never used 
+for spending.
+
+The provider routing in /api/agent/pay should be:
+
+REMOVE the entire provider selection block:
+  if PROVIDER_STRIPE=true → stripe
+  else if PROVIDER_ISSUING=lithic → lithic
+  etc.
+
+REPLACE with this fixed flow:
+
+1. amount_cents = Math.round(req.body.amount * 100)
+
+2. Check card.total_balance >= amount_cents
+   → 402 if insufficient
+
+3. Check card.card_token exists
+   → 400 'Card has no Lithic card token' if missing
+
+4. Simulate the Lithic authorization:
+   const { lithic } = require('../config/providers')
+   
+   Try to retrieve the card to verify it's active:
+   const lithicCard = await lithic.cards.retrieve(
+     card.card_token)
+   
+   If lithicCard.state !== 'OPEN':
+     return 403 { error: 'Card is not active' }
+   
+   provider = 'lithic'
+   provider_ref = card.card_token + '_agent_txn_' + Date.now()
+
+   NOTE: In sandbox mode Lithic does not have a direct 
+   "charge card" API — actual charges come through 
+   merchant terminals. For testing we simulate by 
+   verifying the card is active and decrementing 
+   balance manually. In production the Lithic webhook 
+   fires when a real merchant charges the card.
+
+5. INSERT transactions (same as before)
+6. createLedgerEntry (same as before)  
+7. updateCardBalance (same as before)
+8. INSERT agent_spend_log with provider='lithic'
+9. Return approved response
+
+Also update the /health endpoint to clarify provider roles:
+  providers: {
+    card_issuer: 'lithic',        // always - card spending
+    bank_rails: process.env.PROVIDER_BANK_RAILS || 'modern_treasury', // deposits
+    acquiring: process.env.PROVIDER_ACQUIRING || 'paytheory',          // card loading
+    stripe_deposits: process.env.PROVIDER_STRIPE === 'true'            // stripe loading
+  }
+
+Also update routes/transfers.js and routes/topups.js 
+comments to clarify they are for LOADING money in,
+not for spending.
+
+The PROVIDER_STRIPE flag should only be checked in 
+deposit/topup routes, never in agent pay or any 
+spending route.
+
+Show full updated routes/agent.js and server.js /health.
+Do not touch any other files.
