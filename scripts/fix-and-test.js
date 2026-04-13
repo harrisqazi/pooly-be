@@ -14,8 +14,8 @@ const ADMIN_KEY = process.env.ADMIN_KEY
 const CARD_ID = 'b99854e1-a8a6-4165-a065-44320457b117'
 const AGENT_PROFILE_ID = 'c2d7497e-33dc-4c2b-9c32-d167268aebc6'
 const HUMAN_PROFILE_ID = 'ecbd07cb-9227-421a-91e2-24f22a20e7da'
-const USER_EMAIL = 'harrisahmedqazi@gmail.com'
-const USER_PASSWORD = process.env.TEST_USER_PASSWORD || ''
+const USER_EMAIL = process.env.TEST_USER_EMAIL
+const USER_PASSWORD = process.env.TEST_USER_PASSWORD
 const SECOND_USER_EMAIL = 'harisqazi@yahoo.com'
 const LOG_FILE = path.join(__dirname, 'test-log.md')
 const MAX_ATTEMPTS = 5
@@ -982,9 +982,10 @@ ORDER BY total_risk_score DESC;`)
   // ===== USER AUTH TESTS =====
   log('\n## USER AUTH TESTS')
 
-  if (!USER_PASSWORD) {
-    log('⚠️ TEST_USER_PASSWORD not set — skipping user tests')
-    log('Set it in Replit Secrets as TEST_USER_PASSWORD')
+  if (!USER_EMAIL || !USER_PASSWORD) {
+    if (!USER_EMAIL) log('❌ TEST_USER_EMAIL is not set — required for user tests')
+    if (!USER_PASSWORD) log('❌ TEST_USER_PASSWORD is not set — required for user tests')
+    log('Set both in Replit Secrets and re-run the script')
     log('\n🎉 AGENT TESTS ALL PASSED')
     log('Completed: ' + new Date().toISOString())
     writeLog()
