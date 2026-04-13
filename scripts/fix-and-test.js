@@ -1266,8 +1266,8 @@ ORDER BY total_risk_score DESC;`)
   await runTest(18, 'Create Lithic card for card',
     async (attempt, testKey) => {
     const res = await axios.post(
-      BASE_URL + '/api/lithic',
-      { group_id: USER_CARD_ID, monthlyLimit: 100000 },
+      BASE_URL + '/api/cards/create',
+      { groupId: USER_CARD_ID, monthlyLimit: 100000 },
       { headers: { Authorization: 'Bearer ' + USER_JWT },
         validateStatus: () => true }
     )
@@ -1275,7 +1275,7 @@ ORDER BY total_risk_score DESC;`)
                  !!res.data?.cardToken
 
     const diagnoseAndFix = async () => {
-      log('POST /api/lithic response: ' +
+      log('POST /api/cards/create response: ' +
         JSON.stringify(res.data))
 
       log('Checking card in Supabase for card_token...')
@@ -1285,11 +1285,11 @@ ORDER BY total_risk_score DESC;`)
       log('card_token in DB: ' + card?.card_token)
 
       if (res.status === 404) {
-        log('Route not found — check /api/lithic mount in server.js')
+        log('Route not found — check /api/cards/create mount in server.js')
         writeLog()
         process.exit(1)
       }
-      log('Check routes/lithic.js POST / handler')
+      log('Check POST /api/cards/create handler')
       log('Verify Lithic API key is set and sandbox mode is active')
     }
 
@@ -1307,7 +1307,7 @@ ORDER BY total_risk_score DESC;`)
       data: res.data,
       reason: pass ? null : 'Lithic card creation failed: ' +
         JSON.stringify(res.data),
-      manualFix: 'Check POST /api/lithic route and Lithic API key',
+      manualFix: 'Check POST /api/cards/create route and Lithic API key',
       diagnoseAndFix
     }
   })
