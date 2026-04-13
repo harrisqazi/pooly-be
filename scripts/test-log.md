@@ -1,8 +1,8 @@
 # Pooly Auto-Test Log
-Generated: 2026-04-13T19:50:55.678Z
+Generated: 2026-04-13T19:52:52.157Z
 
 # Pooly Auto-Test Log
-Started: 2026-04-13T19:50:45.257Z
+Started: 2026-04-13T19:52:42.897Z
 BASE_URL: https://8e840236-9463-41e3-838e-7c1a148ad062-00-1lm822cdti16a.kirk.replit.dev
 CARD_ID: b99854e1-a8a6-4165-a065-44320457b117
 AGENT_PROFILE_ID: c2d7497e-33dc-4c2b-9c32-d167268aebc6
@@ -30,7 +30,7 @@ AGENT_PROFILE_ID: c2d7497e-33dc-4c2b-9c32-d167268aebc6
 ✅ PASS: Health check
 Response: {
   "status": "POOLY BACKEND LIVE",
-  "time": "2026-04-13T19:50:47.257Z",
+  "time": "2026-04-13T19:52:44.034Z",
   "providers": {
     "card_issuer": "lithic",
     "bank_rails": "modern_treasury",
@@ -42,11 +42,11 @@ Response: {
 === TEST 2: Agent token issuance ===
 --- Attempt 1 of 5 ---
 AGENT_TOKEN saved (first 30 chars): eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-TOKEN_HASH: a1be79e73baf4cd7b442bd037dc3f25d7f8729f8e164cff8cd107b012d6f74d9
+TOKEN_HASH: cfe8f8d43b8b0ee5a1b0389bef204b4a2b48f7a3bc6284db7ca9fd4caa6482d4
 ✅ PASS: Agent token issuance
 Response: {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9maWxlX2lkIjoiYzJkNzQ5N2UtMzNkYy00YzJiLTljMzItZDE2NzI2OGFlYmM2IiwiY2FyZF9pZCI6ImI5OTg1NGUxLWE4YTYtNDE2NS1hMDY1LTQ0MzIwNDU3YjExNyIsInR5cGUiOiJhZ2VudCIsImlhdCI6MTc3NjEwOTg0NywiZXhwIjoxNzc2MTEzNDQ3fQ.jyF7RUhxq5_vRjnQY5iW2qAkRC4J1whPyDt41i0GmCs",
-  "expires_at": "2026-04-13T20:50:47.698Z",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9maWxlX2lkIjoiYzJkNzQ5N2UtMzNkYy00YzJiLTljMzItZDE2NzI2OGFlYmM2IiwiY2FyZF9pZCI6ImI5OTg1NGUxLWE4YTYtNDE2NS1hMDY1LTQ0MzIwNDU3YjExNyIsInR5cGUiOiJhZ2VudCIsImlhdCI6MTc3NjEwOTk2NCwiZXhwIjoxNzc2MTEzNTY0fQ.lkKgkRyGuLUcVPKs5_-cwHlsEyu_7b-bn17cxeq0rQk",
+  "expires_at": "2026-04-13T20:52:44.293Z",
   "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6"
 }
 
@@ -57,8 +57,8 @@ Response: {
   "approved": true,
   "amount_dollars": 5,
   "provider": "lithic",
-  "provider_ref": "9754f869-5482-44f3-a4d3-eaf303c8b15a_agent_txn_1776109848651",
-  "transaction_id": "4d71d8f5-7ef3-40d4-80e1-b789c1088ae2",
+  "provider_ref": "9754f869-5482-44f3-a4d3-eaf303c8b15a_agent_txn_1776109965152",
+  "transaction_id": "0ec529a4-f492-4443-aa63-92bd6d0e844d",
   "anomaly_flagged": false
 }
 
@@ -75,6 +75,44 @@ Response: {
 ✅ PASS: Spend log
 Response: {
   "data": [
+    {
+      "id": "3dccaff9-be80-4dd3-8af8-febf49785c9f",
+      "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
+      "token_hash": "cfe8f8d43b8b0ee5a1b0389bef204b4a2b48f7a3bc6284db7ca9fd4caa6482d4",
+      "amount": 5000,
+      "merchant_name": "Test Merchant",
+      "mcc": null,
+      "memo": "Over cap test",
+      "status": "blocked",
+      "provider": null,
+      "anomaly_flag": false,
+      "block_reason": "per_txn_cap",
+      "created_at": "2026-04-13T19:52:46.639783+00:00",
+      "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6",
+      "amount_dollars": 50,
+      "agent_name": "gpt4-purchasing-bot",
+      "model_name": "gpt-4o",
+      "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
+    },
+    {
+      "id": "1dfa9763-4116-40c4-9947-a9743ed7c6d7",
+      "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
+      "token_hash": "cfe8f8d43b8b0ee5a1b0389bef204b4a2b48f7a3bc6284db7ca9fd4caa6482d4",
+      "amount": 500,
+      "merchant_name": "Test Merchant",
+      "mcc": null,
+      "memo": "Test payment",
+      "status": "approved",
+      "provider": "lithic",
+      "anomaly_flag": false,
+      "block_reason": null,
+      "created_at": "2026-04-13T19:52:45.969479+00:00",
+      "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6",
+      "amount_dollars": 5,
+      "agent_name": "gpt4-purchasing-bot",
+      "model_name": "gpt-4o",
+      "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
+    },
     {
       "id": "0973b4b5-986c-4da1-84d8-dc55a0ab44a9",
       "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
@@ -266,7 +304,7 @@ Response: {
       "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
     }
   ],
-  "total_count": 10,
+  "total_count": 12,
   "limit": 50,
   "offset": 0
 }
@@ -284,11 +322,11 @@ Response: {
       "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d",
       "kyc_status": "approved",
       "risk_level": "low",
-      "total_spent_dollars": 25,
-      "transaction_count": 5,
-      "blocked_count": 5,
+      "total_spent_dollars": 30,
+      "transaction_count": 6,
+      "blocked_count": 6,
       "anomaly_count": 0,
-      "last_seen": "2026-04-13T19:50:50.028351+00:00",
+      "last_seen": "2026-04-13T19:52:46.639783+00:00",
       "flagged": true
     }
   ]
@@ -306,9 +344,9 @@ Response: {
       "email": null,
       "current_ip": "127.0.0.1",
       "kyc_status": "approved",
-      "anomaly_count": 6,
-      "total_risk_score": 206,
-      "last_anomaly": "2026-04-13T19:50:50.141471+00:00",
+      "anomaly_count": 7,
+      "total_risk_score": 281,
+      "last_anomaly": "2026-04-13T19:52:46.75037+00:00",
       "anomaly_types": [
         "new_ip",
         "rule_breach"
@@ -360,7 +398,7 @@ Response: {
       "phone": null,
       "current_ip": "127.0.0.1",
       "last_seen_ip": null,
-      "last_seen": "2026-04-13T19:50:49.472+00:00",
+      "last_seen": "2026-04-13T19:52:46.028+00:00",
       "model_name": "gpt-4o",
       "model_version": "2024-11",
       "system_prompt_hash": "39e5573d66dbe5b1e09f7630a85b9f0e7f77660fca92ad1cd999628614e081b6",
@@ -424,18 +462,18 @@ Response: {
   "phone": "5551234567",
   "current_ip": "127.0.0.1",
   "last_seen_ip": "127.0.0.1",
-  "last_seen": "2026-04-13T19:23:06.192+00:00",
+  "last_seen": "2026-04-13T19:50:55.365+00:00",
   "model_name": null,
   "model_version": null,
   "system_prompt_hash": null,
   "owner_id": null,
   "kyc_status": "pending",
-  "kyc_submitted_at": "2026-04-13T19:22:56.056+00:00",
+  "kyc_submitted_at": "2026-04-13T19:50:53.541+00:00",
   "kyc_approved_at": null,
   "status": "active",
   "suspension_reason": null,
   "created_at": "2026-04-13T18:48:28.026427+00:00",
-  "updated_at": "2026-04-13T19:22:55.403+00:00",
+  "updated_at": "2026-04-13T19:50:52.883+00:00",
   "kyc": {
     "id": "6ae5ceba-9eba-47ab-8e0a-c3cb225dad26",
     "profile_id": "5fe6ba1e-f02b-400f-959c-8442532396f8",
@@ -456,7 +494,7 @@ Response: {
     "model_card_url": null,
     "intended_use": null,
     "risk_level": "low",
-    "submitted_at": "2026-04-13T19:22:55.96+00:00",
+    "submitted_at": "2026-04-13T19:50:53.437+00:00",
     "reviewed_at": null,
     "reviewed_by": null,
     "created_at": "2026-04-13T18:48:29.512204+00:00",
@@ -477,18 +515,18 @@ Response: {
   "phone": "5551234567",
   "current_ip": "127.0.0.1",
   "last_seen_ip": "127.0.0.1",
-  "last_seen": "2026-04-13T19:50:52.787+00:00",
+  "last_seen": "2026-04-13T19:52:49.366+00:00",
   "model_name": null,
   "model_version": null,
   "system_prompt_hash": null,
   "owner_id": null,
   "kyc_status": "pending",
-  "kyc_submitted_at": "2026-04-13T19:22:56.056+00:00",
+  "kyc_submitted_at": "2026-04-13T19:50:53.541+00:00",
   "kyc_approved_at": null,
   "status": "active",
   "suspension_reason": null,
   "created_at": "2026-04-13T18:48:28.026427+00:00",
-  "updated_at": "2026-04-13T19:50:52.883+00:00"
+  "updated_at": "2026-04-13T19:52:49.466+00:00"
 }
 
 === TEST 14: KYC submission ===
@@ -505,7 +543,7 @@ Cleaning up duplicate test cards...
 Cleanup done
 ✅ PASS: Create card
 Response: {
-  "id": "55a9f9a8-1dd9-442c-b8ca-3dacdd1c737f",
+  "id": "b20ad36d-4e0d-4a2b-b5cb-bb222734df48",
   "name": "Test Card",
   "description": "Created by test suite",
   "group_code": null,
@@ -521,8 +559,8 @@ Response: {
   "blocked_mcc": [],
   "card_status": "active",
   "card_image_url": null,
-  "created_at": "2026-04-13T19:50:54.139077+00:00",
-  "updated_at": "2026-04-13T19:50:54.139077+00:00",
+  "created_at": "2026-04-13T19:52:50.734921+00:00",
+  "updated_at": "2026-04-13T19:52:50.734921+00:00",
   "admin_ids": [],
   "allowed_merchants": [],
   "merchant_restriction_mode": "blacklist",
@@ -531,14 +569,14 @@ Response: {
   "card_name": "My Test Card",
   "agent_ids": [],
   "members": "[\"5fe6ba1e-f02b-400f-959c-8442532396f8\"]",
-  "invite_code": "052B901558C7"
+  "invite_code": "9FEA90642F67"
 }
 
 === TEST 16: Get card ===
 --- Attempt 1 of 5 ---
 ✅ PASS: Get card
 Response: {
-  "id": "55a9f9a8-1dd9-442c-b8ca-3dacdd1c737f",
+  "id": "b20ad36d-4e0d-4a2b-b5cb-bb222734df48",
   "name": "Test Card",
   "description": "Created by test suite",
   "group_code": null,
@@ -554,8 +592,8 @@ Response: {
   "blocked_mcc": [],
   "card_status": "active",
   "card_image_url": null,
-  "created_at": "2026-04-13T19:50:54.139077+00:00",
-  "updated_at": "2026-04-13T19:50:54.139077+00:00",
+  "created_at": "2026-04-13T19:52:50.734921+00:00",
+  "updated_at": "2026-04-13T19:52:50.734921+00:00",
   "admin_ids": [],
   "allowed_merchants": [],
   "merchant_restriction_mode": "blacklist",
@@ -564,7 +602,7 @@ Response: {
   "card_name": "My Test Card",
   "agent_ids": [],
   "members": "[\"5fe6ba1e-f02b-400f-959c-8442532396f8\"]",
-  "invite_code": "052B901558C7"
+  "invite_code": "9FEA90642F67"
 }
 
 === TEST 17: Set card limits ===
@@ -577,12 +615,12 @@ Response: {
 
 === TEST 18: Create Lithic card for card ===
 --- Attempt 1 of 5 ---
-❌ FAIL attempt 1: Lithic card creation failed: "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /api/lithic</pre>\n</body>\n</html>\n"
+❌ FAIL attempt 1: Lithic card creation failed: "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /api/cards/create</pre>\n</body>\n</html>\n"
 HTTP Status: 404
-Response: "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /api/lithic</pre>\n</body>\n</html>\n"
+Response: "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /api/cards/create</pre>\n</body>\n</html>\n"
 Matched predicted cause: no
 Running diagnoseAndFix...
-POST /api/lithic response: "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /api/lithic</pre>\n</body>\n</html>\n"
+POST /api/cards/create response: "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /api/cards/create</pre>\n</body>\n</html>\n"
 Checking card in Supabase for card_token...
 card_token in DB: null
-Route not found — check /api/lithic mount in server.js
+Route not found — check /api/cards/create mount in server.js

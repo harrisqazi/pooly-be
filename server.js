@@ -89,6 +89,60 @@ app.use('/api/topups', topupsRoutes);
 app.use('/api/webhooks', webhooksRoutes);
 app.use('/api/agent', agentRoutes);
 
+// ========= POST /api/cards/create (Lithic virtual card) =========
+app.post('/api/cards/create', async (req, res) => {
+  try {
+    const { groupId, monthlyLimit = 500000 } = req.body;
+    if (!groupId) {
+      return res.status(400).json({ error: 'Missing groupId' });
+    }
+
+    const monthlyLimitNum = Number(monthlyLimit);
+    if (!Number.isInteger(monthlyLimitNum)) {
+      return res.status(400).json({
+        error: 'monthlyLimit must be an integer',
+        received: monthlyLimit
+      });
+    }
+
+    const { lithic } = require('./config/providers');
+    const card = await lithic.cards.create({
+      type: 'VIRTUAL',
+      spend_limit: monthlyLimitNum,
+      spend_limit_duration: 'FOREVER'
+    });
+
+    const { error: updateError } = await supabase
+      .from('cards')
+      .update({ card_token: card.token })
+      .eq('id', groupId);
+
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message });
+    }
+
+    const { error: cardInsertError } = await supabase
+      .from('cards')
+      .update({
+        card_token: card.token,
+        card_status: card.state || 'OPEN'
+      })
+      .eq('id', groupId);
+
+    if (cardInsertError) {
+      return res.status(500).json({ error: cardInsertError.message });
+    }
+
+    res.json({
+      success: true,
+      cardToken: card.token,
+      message: 'Virtual card created for group'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========= LEGACY INLINE ROUTES (updated — cards table) =========
 app.get('/cards', async (req, res) => {
   if (!req.user || !req.profile) return res.status(401).json({ error: 'Unauthorized' });
