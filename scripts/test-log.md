@@ -1,8 +1,8 @@
 # Pooly Auto-Test Log
-Generated: 2026-04-13T16:11:42.708Z
+Generated: 2026-04-13T16:22:38.858Z
 
 # Pooly Auto-Test Log
-Started: 2026-04-13T16:11:35.148Z
+Started: 2026-04-13T16:22:31.861Z
 BASE_URL: https://8e840236-9463-41e3-838e-7c1a148ad062-00-1lm822cdti16a.kirk.replit.dev
 CARD_ID: b99854e1-a8a6-4165-a065-44320457b117
 AGENT_PROFILE_ID: c2d7497e-33dc-4c2b-9c32-d167268aebc6
@@ -30,7 +30,7 @@ AGENT_PROFILE_ID: c2d7497e-33dc-4c2b-9c32-d167268aebc6
 ✅ PASS: Health check
 Response: {
   "status": "POOLY BACKEND LIVE",
-  "time": "2026-04-13T16:11:37.686Z",
+  "time": "2026-04-13T16:22:34.111Z",
   "providers": {
     "card_issuer": "lithic",
     "bank_rails": "modern_treasury",
@@ -42,11 +42,11 @@ Response: {
 === TEST 2: Agent token issuance ===
 --- Attempt 1 of 5 ---
 AGENT_TOKEN saved (first 30 chars): eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-TOKEN_HASH: 8057ab6ad67cf98c7959bf0c3a841570593a9adf9cd421147bfddf90fff067ab
+TOKEN_HASH: cbf8890ff56a7c09aec07be931b05884a6dda610a6a98743ee183adb48e2ef9d
 ✅ PASS: Agent token issuance
 Response: {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9maWxlX2lkIjoiYzJkNzQ5N2UtMzNkYy00YzJiLTljMzItZDE2NzI2OGFlYmM2IiwiY2FyZF9pZCI6ImI5OTg1NGUxLWE4YTYtNDE2NS1hMDY1LTQ0MzIwNDU3YjExNyIsInR5cGUiOiJhZ2VudCIsImlhdCI6MTc3NjA5NjY5OCwiZXhwIjoxNzc2MTAwMjk4fQ.MFml9nD9Qwmq3Dq5aVO4K3G0aG1LHmyIhmeRIBbbnLA",
-  "expires_at": "2026-04-13T17:11:38.191Z",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9maWxlX2lkIjoiYzJkNzQ5N2UtMzNkYy00YzJiLTljMzItZDE2NzI2OGFlYmM2IiwiY2FyZF9pZCI6ImI5OTg1NGUxLWE4YTYtNDE2NS1hMDY1LTQ0MzIwNDU3YjExNyIsInR5cGUiOiJhZ2VudCIsImlhdCI6MTc3NjA5NzM1NCwiZXhwIjoxNzc2MTAwOTU0fQ.qnI3gRFAtuckxtkXCnMa9_qwsOaOCYgtbXwtUnivP70",
+  "expires_at": "2026-04-13T17:22:34.410Z",
   "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6"
 }
 
@@ -57,8 +57,8 @@ Response: {
   "approved": true,
   "amount_dollars": 5,
   "provider": "lithic",
-  "provider_ref": "9754f869-5482-44f3-a4d3-eaf303c8b15a_agent_txn_1776096699457",
-  "transaction_id": "cc99b95c-e1c6-43d1-b744-0df1bfdbfafc",
+  "provider_ref": "9754f869-5482-44f3-a4d3-eaf303c8b15a_agent_txn_1776097355569",
+  "transaction_id": "d5405983-0e45-4cbd-b330-ee56d95cff9a",
   "anomaly_flagged": false
 }
 
@@ -75,6 +75,44 @@ Response: {
 ✅ PASS: Spend log
 Response: {
   "data": [
+    {
+      "id": "2135122a-f2f1-4327-8935-617772115918",
+      "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
+      "token_hash": "cbf8890ff56a7c09aec07be931b05884a6dda610a6a98743ee183adb48e2ef9d",
+      "amount": 5000,
+      "merchant_name": "Test Merchant",
+      "mcc": null,
+      "memo": "Over cap test",
+      "status": "blocked",
+      "provider": null,
+      "anomaly_flag": false,
+      "block_reason": "per_txn_cap",
+      "created_at": "2026-04-13T16:22:36.89384+00:00",
+      "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6",
+      "amount_dollars": 50,
+      "agent_name": "gpt4-purchasing-bot",
+      "model_name": "gpt-4o",
+      "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
+    },
+    {
+      "id": "3f7cbf85-341a-4966-9387-f5a9b74efbbb",
+      "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
+      "token_hash": "cbf8890ff56a7c09aec07be931b05884a6dda610a6a98743ee183adb48e2ef9d",
+      "amount": 500,
+      "merchant_name": "Test Merchant",
+      "mcc": null,
+      "memo": "Test payment",
+      "status": "approved",
+      "provider": "lithic",
+      "anomaly_flag": false,
+      "block_reason": null,
+      "created_at": "2026-04-13T16:22:36.197749+00:00",
+      "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6",
+      "amount_dollars": 5,
+      "agent_name": "gpt4-purchasing-bot",
+      "model_name": "gpt-4o",
+      "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
+    },
     {
       "id": "31bf46a0-0a1e-4212-b02e-91468509f0c3",
       "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
@@ -114,7 +152,7 @@ Response: {
       "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
     }
   ],
-  "total_count": 2,
+  "total_count": 4,
   "limit": 50,
   "offset": 0
 }
@@ -132,11 +170,11 @@ Response: {
       "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d",
       "kyc_status": "approved",
       "risk_level": "low",
-      "total_spent_dollars": 5,
-      "transaction_count": 1,
-      "blocked_count": 1,
+      "total_spent_dollars": 10,
+      "transaction_count": 2,
+      "blocked_count": 2,
       "anomaly_count": 0,
-      "last_seen": "2026-04-13T16:11:40.778488+00:00",
+      "last_seen": "2026-04-13T16:22:36.89384+00:00",
       "flagged": false
     }
   ]
@@ -154,14 +192,14 @@ Response: {
       "email": null,
       "current_ip": "127.0.0.1",
       "kyc_status": "approved",
-      "anomaly_count": 2,
-      "total_risk_score": 76,
-      "last_anomaly": "2026-04-13T16:11:40.877209+00:00",
+      "anomaly_count": 3,
+      "total_risk_score": 151,
+      "last_anomaly": "2026-04-13T16:22:36.9942+00:00",
       "anomaly_types": [
         "new_ip",
         "rule_breach"
       ],
-      "risk_level": "medium"
+      "risk_level": "high"
     },
     {
       "profile_id": "ecbd07cb-9227-421a-91e2-24f22a20e7da",
@@ -208,7 +246,7 @@ Response: {
       "phone": null,
       "current_ip": "127.0.0.1",
       "last_seen_ip": null,
-      "last_seen": "2026-04-13T16:11:40.205+00:00",
+      "last_seen": "2026-04-13T16:22:36.276+00:00",
       "model_name": "gpt-4o",
       "model_version": "2024-11",
       "system_prompt_hash": "39e5573d66dbe5b1e09f7630a85b9f0e7f77660fca92ad1cd999628614e081b6",
@@ -251,4 +289,4 @@ Response: {
 }
 
 🎉 ALL TESTS PASSED
-Completed: 2026-04-13T16:11:42.708Z
+Completed: 2026-04-13T16:22:38.858Z

@@ -62,7 +62,7 @@ const authMiddleware = async (req, res, next) => {
 };
 
 // Public routes — no auth required
-const publicRoutes = ['/health', '/api/webhooks', '/api/agent'];
+const publicRoutes = ['/health', '/api/webhooks', '/api/agent', '/api/dev'];
 
 app.use((req, res, next) => {
   const isPublic = publicRoutes.some(route => req.path.startsWith(route));
@@ -159,6 +159,22 @@ app.get('/health', (req, res) => res.json({
     stripe_deposits: process.env.PROVIDER_STRIPE === 'true'
   }
 }));
+
+// ========= DEV ONLY: test-token =========
+if (process.env.NODE_ENV !== 'production') {
+  app.post('/api/dev/test-token', async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password required' });
+    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return res.status(401).json({ error: error.message });
+    return res.json({
+      access_token: data.session.access_token,
+      user_id: data.user.id
+    });
+  });
+}
 
 // ========= TEST AUTH ROUTE =========
 app.get('/api/test-auth', async (req, res) => {
