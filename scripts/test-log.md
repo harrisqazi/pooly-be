@@ -1,8 +1,8 @@
 # Pooly Auto-Test Log
-Generated: 2026-04-13T16:22:38.858Z
+Generated: 2026-04-13T18:48:40.728Z
 
 # Pooly Auto-Test Log
-Started: 2026-04-13T16:22:31.861Z
+Started: 2026-04-13T18:48:17.350Z
 BASE_URL: https://8e840236-9463-41e3-838e-7c1a148ad062-00-1lm822cdti16a.kirk.replit.dev
 CARD_ID: b99854e1-a8a6-4165-a065-44320457b117
 AGENT_PROFILE_ID: c2d7497e-33dc-4c2b-9c32-d167268aebc6
@@ -30,7 +30,7 @@ AGENT_PROFILE_ID: c2d7497e-33dc-4c2b-9c32-d167268aebc6
 ✅ PASS: Health check
 Response: {
   "status": "POOLY BACKEND LIVE",
-  "time": "2026-04-13T16:22:34.111Z",
+  "time": "2026-04-13T18:48:20.184Z",
   "providers": {
     "card_issuer": "lithic",
     "bank_rails": "modern_treasury",
@@ -42,11 +42,11 @@ Response: {
 === TEST 2: Agent token issuance ===
 --- Attempt 1 of 5 ---
 AGENT_TOKEN saved (first 30 chars): eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-TOKEN_HASH: cbf8890ff56a7c09aec07be931b05884a6dda610a6a98743ee183adb48e2ef9d
+TOKEN_HASH: 4f84f32f61b423727c16ae5b54ee43abc3b16b09ad4d7beed7994552dd47dbd5
 ✅ PASS: Agent token issuance
 Response: {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9maWxlX2lkIjoiYzJkNzQ5N2UtMzNkYy00YzJiLTljMzItZDE2NzI2OGFlYmM2IiwiY2FyZF9pZCI6ImI5OTg1NGUxLWE4YTYtNDE2NS1hMDY1LTQ0MzIwNDU3YjExNyIsInR5cGUiOiJhZ2VudCIsImlhdCI6MTc3NjA5NzM1NCwiZXhwIjoxNzc2MTAwOTU0fQ.qnI3gRFAtuckxtkXCnMa9_qwsOaOCYgtbXwtUnivP70",
-  "expires_at": "2026-04-13T17:22:34.410Z",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9maWxlX2lkIjoiYzJkNzQ5N2UtMzNkYy00YzJiLTljMzItZDE2NzI2OGFlYmM2IiwiY2FyZF9pZCI6ImI5OTg1NGUxLWE4YTYtNDE2NS1hMDY1LTQ0MzIwNDU3YjExNyIsInR5cGUiOiJhZ2VudCIsImlhdCI6MTc3NjEwNjEwMCwiZXhwIjoxNzc2MTA5NzAwfQ.Hcubkb96DR-9dUpFCjgtZxbJ1Q4y7cQXTvMilIvP3aY",
+  "expires_at": "2026-04-13T19:48:20.911Z",
   "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6"
 }
 
@@ -57,8 +57,8 @@ Response: {
   "approved": true,
   "amount_dollars": 5,
   "provider": "lithic",
-  "provider_ref": "9754f869-5482-44f3-a4d3-eaf303c8b15a_agent_txn_1776097355569",
-  "transaction_id": "d5405983-0e45-4cbd-b330-ee56d95cff9a",
+  "provider_ref": "9754f869-5482-44f3-a4d3-eaf303c8b15a_agent_txn_1776106102702",
+  "transaction_id": "d9c06c36-2509-4eec-bba3-80584b3a7311",
   "anomaly_flagged": false
 }
 
@@ -75,6 +75,44 @@ Response: {
 ✅ PASS: Spend log
 Response: {
   "data": [
+    {
+      "id": "edcc138e-4e29-40bb-b2a7-72acec2e7351",
+      "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
+      "token_hash": "4f84f32f61b423727c16ae5b54ee43abc3b16b09ad4d7beed7994552dd47dbd5",
+      "amount": 5000,
+      "merchant_name": "Test Merchant",
+      "mcc": null,
+      "memo": "Over cap test",
+      "status": "blocked",
+      "provider": null,
+      "anomaly_flag": false,
+      "block_reason": "per_txn_cap",
+      "created_at": "2026-04-13T18:48:24.559427+00:00",
+      "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6",
+      "amount_dollars": 50,
+      "agent_name": "gpt4-purchasing-bot",
+      "model_name": "gpt-4o",
+      "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
+    },
+    {
+      "id": "073502d6-6bfe-489c-b0a3-27e64fc71206",
+      "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
+      "token_hash": "4f84f32f61b423727c16ae5b54ee43abc3b16b09ad4d7beed7994552dd47dbd5",
+      "amount": 500,
+      "merchant_name": "Test Merchant",
+      "mcc": null,
+      "memo": "Test payment",
+      "status": "approved",
+      "provider": "lithic",
+      "anomaly_flag": false,
+      "block_reason": null,
+      "created_at": "2026-04-13T18:48:23.574627+00:00",
+      "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6",
+      "amount_dollars": 5,
+      "agent_name": "gpt4-purchasing-bot",
+      "model_name": "gpt-4o",
+      "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
+    },
     {
       "id": "2135122a-f2f1-4327-8935-617772115918",
       "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
@@ -152,7 +190,7 @@ Response: {
       "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
     }
   ],
-  "total_count": 4,
+  "total_count": 6,
   "limit": 50,
   "offset": 0
 }
@@ -170,12 +208,12 @@ Response: {
       "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d",
       "kyc_status": "approved",
       "risk_level": "low",
-      "total_spent_dollars": 10,
-      "transaction_count": 2,
-      "blocked_count": 2,
+      "total_spent_dollars": 15,
+      "transaction_count": 3,
+      "blocked_count": 3,
       "anomaly_count": 0,
-      "last_seen": "2026-04-13T16:22:36.89384+00:00",
-      "flagged": false
+      "last_seen": "2026-04-13T18:48:24.559427+00:00",
+      "flagged": true
     }
   ]
 }
@@ -192,14 +230,14 @@ Response: {
       "email": null,
       "current_ip": "127.0.0.1",
       "kyc_status": "approved",
-      "anomaly_count": 3,
-      "total_risk_score": 151,
-      "last_anomaly": "2026-04-13T16:22:36.9942+00:00",
+      "anomaly_count": 4,
+      "total_risk_score": 78,
+      "last_anomaly": "2026-04-13T18:48:24.717493+00:00",
       "anomaly_types": [
         "new_ip",
         "rule_breach"
       ],
-      "risk_level": "high"
+      "risk_level": "medium"
     },
     {
       "profile_id": "ecbd07cb-9227-421a-91e2-24f22a20e7da",
@@ -246,7 +284,7 @@ Response: {
       "phone": null,
       "current_ip": "127.0.0.1",
       "last_seen_ip": null,
-      "last_seen": "2026-04-13T16:22:36.276+00:00",
+      "last_seen": "2026-04-13T18:48:23.652+00:00",
       "model_name": "gpt-4o",
       "model_version": "2024-11",
       "system_prompt_hash": "39e5573d66dbe5b1e09f7630a85b9f0e7f77660fca92ad1cd999628614e081b6",
@@ -288,5 +326,181 @@ Response: {
   ]
 }
 
-🎉 ALL TESTS PASSED
-Completed: 2026-04-13T16:22:38.858Z
+## USER AUTH TESTS
+
+=== TEST 11: Get user JWT ===
+--- Attempt 1 of 5 ---
+✅ PASS: Get user JWT
+Response: {
+  "access_token": "eyJhbGciOiJIUzI1NiIsImtpZCI6In..."
+}
+
+=== TEST 12: Profile created on login ===
+--- Attempt 1 of 5 ---
+✅ PASS: Profile created on login
+Response: {
+  "id": "5fe6ba1e-f02b-400f-959c-8442532396f8",
+  "auth_id": "79ad6c1b-d44d-4470-98e1-be337e519999",
+  "type": "human",
+  "first_name": null,
+  "last_name": null,
+  "email": "test@pooly.com",
+  "phone": null,
+  "current_ip": "127.0.0.1",
+  "last_seen_ip": null,
+  "last_seen": "2026-04-13T18:48:27.964+00:00",
+  "model_name": null,
+  "model_version": null,
+  "system_prompt_hash": null,
+  "owner_id": null,
+  "kyc_status": "pending",
+  "kyc_submitted_at": null,
+  "kyc_approved_at": null,
+  "status": "active",
+  "suspension_reason": null,
+  "created_at": "2026-04-13T18:48:28.026427+00:00",
+  "updated_at": "2026-04-13T18:48:28.026427+00:00",
+  "kyc": null
+}
+
+=== TEST 13: Update profile ===
+--- Attempt 1 of 5 ---
+✅ PASS: Update profile
+Response: {
+  "id": "5fe6ba1e-f02b-400f-959c-8442532396f8",
+  "auth_id": "79ad6c1b-d44d-4470-98e1-be337e519999",
+  "type": "human",
+  "first_name": "Harris",
+  "last_name": "Qazi",
+  "email": "test@pooly.com",
+  "phone": "5551234567",
+  "current_ip": "127.0.0.1",
+  "last_seen_ip": "127.0.0.1",
+  "last_seen": "2026-04-13T18:48:28.581+00:00",
+  "model_name": null,
+  "model_version": null,
+  "system_prompt_hash": null,
+  "owner_id": null,
+  "kyc_status": "pending",
+  "kyc_submitted_at": null,
+  "kyc_approved_at": null,
+  "status": "active",
+  "suspension_reason": null,
+  "created_at": "2026-04-13T18:48:28.026427+00:00",
+  "updated_at": "2026-04-13T18:48:28.73+00:00"
+}
+
+=== TEST 14: KYC submission ===
+--- Attempt 1 of 5 ---
+✅ PASS: KYC submission
+Response: {
+  "submitted": true,
+  "fingerprint": "4348d576952700b332e42d72713dcbec5118f0b038281c03d79726acc2f13edc"
+}
+
+=== TEST 15: Create card ===
+--- Attempt 1 of 5 ---
+❌ FAIL attempt 1: Card creation failed: {"error":"null value in column \"group_code\" of relation \"cards\" violates not-null constraint"}
+HTTP Status: 500
+Response: {
+  "error": "null value in column \"group_code\" of relation \"cards\" violates not-null constraint"
+}
+Matched predicted cause: no
+Running diagnoseAndFix...
+POST /api/cards response: {"error":"null value in column \"group_code\" of relation \"cards\" violates not-null constraint"}
+USER_PROFILE_ID: 5fe6ba1e-f02b-400f-959c-8442532396f8
+Check routes/cards.js POST / handler
+Verify invite_code generation and members array init
+Retrying test 15...
+--- Attempt 2 of 5 ---
+❌ FAIL attempt 2: Card creation failed: {"error":"null value in column \"group_code\" of relation \"cards\" violates not-null constraint"}
+HTTP Status: 500
+Response: {
+  "error": "null value in column \"group_code\" of relation \"cards\" violates not-null constraint"
+}
+Matched predicted cause: no
+Running diagnoseAndFix...
+POST /api/cards response: {"error":"null value in column \"group_code\" of relation \"cards\" violates not-null constraint"}
+USER_PROFILE_ID: 5fe6ba1e-f02b-400f-959c-8442532396f8
+Check routes/cards.js POST / handler
+Verify invite_code generation and members array init
+Retrying test 15...
+--- Attempt 3 of 5 ---
+❌ FAIL attempt 3: Card creation failed: {"error":"null value in column \"group_code\" of relation \"cards\" violates not-null constraint"}
+HTTP Status: 500
+Response: {
+  "error": "null value in column \"group_code\" of relation \"cards\" violates not-null constraint"
+}
+Matched predicted cause: no
+Running diagnoseAndFix...
+POST /api/cards response: {"error":"null value in column \"group_code\" of relation \"cards\" violates not-null constraint"}
+USER_PROFILE_ID: 5fe6ba1e-f02b-400f-959c-8442532396f8
+Check routes/cards.js POST / handler
+Verify invite_code generation and members array init
+Retrying test 15...
+--- Attempt 4 of 5 ---
+❌ FAIL attempt 4: Card creation failed: {"error":"null value in column \"group_code\" of relation \"cards\" violates not-null constraint"}
+HTTP Status: 500
+Response: {
+  "error": "null value in column \"group_code\" of relation \"cards\" violates not-null constraint"
+}
+Matched predicted cause: no
+Running diagnoseAndFix...
+POST /api/cards response: {"error":"null value in column \"group_code\" of relation \"cards\" violates not-null constraint"}
+USER_PROFILE_ID: 5fe6ba1e-f02b-400f-959c-8442532396f8
+Check routes/cards.js POST / handler
+Verify invite_code generation and members array init
+Retrying test 15...
+--- Attempt 5 of 5 ---
+❌ FAIL attempt 5: Card creation failed: {"error":"null value in column \"group_code\" of relation \"cards\" violates not-null constraint"}
+HTTP Status: 500
+Response: {
+  "error": "null value in column \"group_code\" of relation \"cards\" violates not-null constraint"
+}
+Matched predicted cause: no
+🛑 EXHAUSTED 5 ATTEMPTS on TEST 15
+Full history for this test:
+[
+  {
+    "attempt": 1,
+    "error": "Card creation failed: {\"error\":\"null value in column \\\"group_code\\\" of relation \\\"cards\\\" violates not-null constraint\"}",
+    "hypothesis": "unknown",
+    "fixApplied": "none",
+    "result": "fail",
+    "timestamp": "2026-04-13T18:48:30.344Z"
+  },
+  {
+    "attempt": 2,
+    "error": "Card creation failed: {\"error\":\"null value in column \\\"group_code\\\" of relation \\\"cards\\\" violates not-null constraint\"}",
+    "hypothesis": "unknown",
+    "fixApplied": "none",
+    "result": "fail",
+    "timestamp": "2026-04-13T18:48:32.962Z"
+  },
+  {
+    "attempt": 3,
+    "error": "Card creation failed: {\"error\":\"null value in column \\\"group_code\\\" of relation \\\"cards\\\" violates not-null constraint\"}",
+    "hypothesis": "unknown",
+    "fixApplied": "none",
+    "result": "fail",
+    "timestamp": "2026-04-13T18:48:35.536Z"
+  },
+  {
+    "attempt": 4,
+    "error": "Card creation failed: {\"error\":\"null value in column \\\"group_code\\\" of relation \\\"cards\\\" violates not-null constraint\"}",
+    "hypothesis": "unknown",
+    "fixApplied": "none",
+    "result": "fail",
+    "timestamp": "2026-04-13T18:48:38.141Z"
+  },
+  {
+    "attempt": 5,
+    "error": "Card creation failed: {\"error\":\"null value in column \\\"group_code\\\" of relation \\\"cards\\\" violates not-null constraint\"}",
+    "hypothesis": "unknown",
+    "fixApplied": "none",
+    "result": "fail",
+    "timestamp": "2026-04-13T18:48:40.727Z"
+  }
+]
+RECOMMENDED MANUAL FIX:
+Check POST /api/cards route — invite_code and members must be set on create

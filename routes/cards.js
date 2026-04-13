@@ -72,6 +72,7 @@ router.post('/', async (req, res) => {
         total_balance: 0,
         spending_limits: { daily_cap: 0, max_per_txn: 0 },
         invite_code,
+        group_code: invite_code,
         blocked_mcc: []
       })
       .select()
