@@ -163,16 +163,22 @@ app.get('/health', (req, res) => res.json({
 // ========= DEV ONLY: test-token =========
 if (process.env.NODE_ENV !== 'production') {
   app.post('/api/dev/test-token', async (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'email and password required' });
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'email and password required' });
+      }
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return res.status(401).json({ error: error.message });
+      return res.json({
+        access_token: data.session.access_token,
+        user_id: data.user.id,
+        email: data.user.email,
+        expires_at: data.session.expires_at
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
     }
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return res.status(401).json({ error: error.message });
-    return res.json({
-      access_token: data.session.access_token,
-      user_id: data.user.id
-    });
   });
 }
 

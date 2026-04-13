@@ -1,0 +1,172 @@
+Add this endpoint to server.js.
+Only add it when NODE_ENV is not 'production'.
+This is for development testing only.
+
+if (process.env.NODE_ENV !== 'production') {
+  app.post('/api/dev/test-token', async (req, res) => {
+    try {
+      const { email, password } = req.body
+      if (!email || !password) {
+        return res.status(400).json({ 
+          error: 'email and password required' 
+        })
+      }
+      const { data, error } = await supabase.auth
+        .signInWithPassword({ email, password })
+      if (error) {
+        return res.status(401).json({ 
+          error: error.message 
+        })
+      }
+      return res.json({
+        access_token: data.session.access_token,
+        user_id: data.user.id,
+        email: data.user.email,
+        expires_at: data.session.expires_at
+      })
+    } catch (err) {
+      return res.status(500).json({ 
+        error: err.message 
+      })
+    }
+  })
+}
+
+Then update scripts/fix-and-test.js to add these 
+tests after TEST 10. Add a new section called 
+USER AUTH TESTS that first gets a JWT:
+
+const USER_EMAIL = 'harrisahmedqazi@gmail.com'
+const USER_PASSWORD = process.env.TEST_USER_PASSWORD || ''
+
+if (!USER_PASSWORD) {
+  log('⚠️ TEST_USER_PASSWORD not set — skipping user tests')
+  log('Set it in Replit Secrets as TEST_USER_PASSWORD')
+  writeLog()
+  process.exit(0)
+}
+
+async function getUserJWT() {
+  const res = await axios.post(
+    BASE_URL + '/api/dev/test-token',
+    { email: USER_EMAIL, password: USER_PASSWORD },
+    { validateStatus: () => true }
+  )
+  if (!res.data?.access_token) {
+    throw new Error('Could not get user JWT: ' + 
+      JSON.stringify(res.data))
+  }
+  return res.data.access_token
+}
+
+let USER_JWT = null
+let USER_CARD_ID = null
+let USER_INVITE_CODE = null
+
+Then add these tests:
+
+TEST 11 — Get user JWT
+  Call getUserJWT()
+  Pass if: token is a non-empty string
+  Save as USER_JWT
+
+TEST 12 — Profile created on login
+  GET /api/auth/profile
+  Headers: Authorization: Bearer USER_JWT
+  Pass if: response has id, type='human', email matches
+  Save profile.id as USER_PROFILE_ID
+
+TEST 13 — Update profile
+  PUT /api/auth/profile
+  Headers: Authorization: Bearer USER_JWT
+  Body: { first_name: 'Harris', last_name: 'Qazi', 
+          phone: '5551234567' }
+  Pass if: response.first_name === 'Harris'
+
+TEST 14 — KYC submission
+  POST /api/auth/kyc
+  Headers: Authorization: Bearer USER_JWT
+  Body: {
+    first_name: 'Harris',
+    last_name: 'Qazi',
+    date_of_birth: '1995-01-01',
+    ssn_last_four: '1234',
+    address_line1: '123 Test St',
+    city: 'Chicago',
+    state: 'IL',
+    zip: '60601',
+    id_type: 'drivers_license'
+  }
+  Pass if: response.submitted === true AND 
+           response.fingerprint is a string
+  On 409 (duplicate identity): also pass — 
+    means KYC was already submitted, log it and continue
+
+TEST 15 — Create card
+  POST /api/cards
+  Headers: Authorization: Bearer USER_JWT
+  Body: { 
+    name: 'Test Card', 
+    card_name: 'My Test Card',
+    description: 'Created by test suite'
+  }
+  Pass if: response.id exists AND 
+           response.invite_code exists AND
+           response.members contains USER_PROFILE_ID
+  Save response.id as USER_CARD_ID
+  Save response.invite_code as USER_INVITE_CODE
+
+TEST 16 — Get card
+  GET /api/cards/USER_CARD_ID
+  Headers: Authorization: Bearer USER_JWT
+  Pass if: response.id === USER_CARD_ID AND
+           response.card_name === 'My Test Card'
+
+TEST 17 — Set card limits
+  PUT /api/cards/USER_CARD_ID/limits
+  Headers: Authorization: Bearer USER_JWT
+  Body: { daily_cap: 200, max_per_txn: 50 }
+  Pass if: response.daily_cap === 200 AND
+           response.max_per_txn === 50
+
+TEST 18 — Create Lithic card for card
+  POST /api/lithic (or /api/cards/create — 
+    check which route handles Lithic card creation)
+  Headers: Authorization: Bearer USER_JWT
+  Body: { 
+    group_id: USER_CARD_ID,
+    monthlyLimit: 100000
+  }
+  Pass if: response.success === true AND
+           response.cardToken exists
+  Verify card_token was saved to cards table in Supabase
+
+TEST 19 — List cards
+  GET /api/cards
+  Headers: Authorization: Bearer USER_JWT
+  Pass if: response is array AND
+           at least one card has id === USER_CARD_ID
+
+TEST 20 — List transactions
+  GET /api/transactions?card_id=USER_CARD_ID
+  Headers: Authorization: Bearer USER_JWT
+  Pass if: response is array (can be empty)
+
+TEST 21 — Card join flow
+  This test needs a second user.
+  Use email: harisqazi@yahoo.com
+  Get second user JWT via /api/dev/test-token
+  POST /api/cards/join
+  Headers: Authorization: Bearer SECOND_USER_JWT
+  Body: { invite_code: USER_INVITE_CODE }
+  Pass if: response has id === USER_CARD_ID AND
+           response.members contains SECOND_USER_PROFILE_ID
+  
+  Get SECOND_USER_PROFILE_ID by calling 
+  GET /api/auth/profile with SECOND_USER_JWT first
+
+Add TEST_USER_PASSWORD to the fix constants at top.
+Read it from process.env.TEST_USER_PASSWORD.
+
+Show full updated scripts/fix-and-test.js.
+Do not modify any route files.

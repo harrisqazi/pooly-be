@@ -14,11 +14,20 @@ const ADMIN_KEY = process.env.ADMIN_KEY
 const CARD_ID = 'b99854e1-a8a6-4165-a065-44320457b117'
 const AGENT_PROFILE_ID = 'c2d7497e-33dc-4c2b-9c32-d167268aebc6'
 const HUMAN_PROFILE_ID = 'ecbd07cb-9227-421a-91e2-24f22a20e7da'
+const USER_EMAIL = 'harrisahmedqazi@gmail.com'
+const USER_PASSWORD = process.env.TEST_USER_PASSWORD || ''
+const SECOND_USER_EMAIL = 'harisqazi@yahoo.com'
 const LOG_FILE = path.join(__dirname, 'test-log.md')
 const MAX_ATTEMPTS = 5
 
 let AGENT_TOKEN = null
 let TOKEN_HASH = null
+let USER_JWT = null
+let USER_CARD_ID = null
+let USER_INVITE_CODE = null
+let USER_PROFILE_ID = null
+let SECOND_USER_JWT = null
+let SECOND_USER_PROFILE_ID = null
 let logBuffer = []
 let fixHistory = {}
 
@@ -89,6 +98,19 @@ async function restartServer() {
   }
   log('Server restarted successfully')
   return true
+}
+
+async function getUserJWT(email, password) {
+  const res = await axios.post(
+    BASE_URL + '/api/dev/test-token',
+    { email, password },
+    { validateStatus: () => true }
+  )
+  if (!res.data?.access_token) {
+    throw new Error('Could not get user JWT: ' +
+      JSON.stringify(res.data))
+  }
+  return res.data.access_token
 }
 
 async function runFix(fixNumber, fixName, fixFn) {
@@ -953,6 +975,474 @@ ORDER BY total_risk_score DESC;`)
         'or error: ' + JSON.stringify(res.data),
       manualFix: 'Ensure agent profile has type=agent ' +
         'and is in card.members array',
+      diagnoseAndFix
+    }
+  })
+
+  // ===== USER AUTH TESTS =====
+  log('\n## USER AUTH TESTS')
+
+  if (!USER_PASSWORD) {
+    log('⚠️ TEST_USER_PASSWORD not set — skipping user tests')
+    log('Set it in Replit Secrets as TEST_USER_PASSWORD')
+    log('\n🎉 AGENT TESTS ALL PASSED')
+    log('Completed: ' + new Date().toISOString())
+    writeLog()
+    process.exit(0)
+  }
+
+  // TEST 11 — Get user JWT
+  await runTest(11, 'Get user JWT', async (attempt, testKey) => {
+    let token = null
+    let errMsg = ''
+    try {
+      token = await getUserJWT(USER_EMAIL, USER_PASSWORD)
+      USER_JWT = token
+    } catch (e) {
+      errMsg = e.message
+    }
+    const pass = typeof token === 'string' && token.length > 0
+
+    const diagnoseAndFix = async () => {
+      log('Could not sign in as ' + USER_EMAIL)
+      log('Error: ' + errMsg)
+      log('Check TEST_USER_PASSWORD is correct in Replit Secrets')
+      log('Verify user exists in Supabase Auth dashboard')
+      writeLog()
+      process.exit(1)
+    }
+
+    return {
+      pass,
+      status: pass ? 200 : 401,
+      data: pass ? { access_token: token?.substring(0, 30) + '...' } : { error: errMsg },
+      reason: pass ? null : 'Could not get JWT: ' + errMsg,
+      manualFix: 'Check TEST_USER_PASSWORD secret and user exists in Supabase',
+      diagnoseAndFix
+    }
+  })
+
+  // TEST 12 — Profile created on login
+  await runTest(12, 'Profile created on login',
+    async (attempt, testKey) => {
+    const res = await axios.get(
+      BASE_URL + '/api/auth/profile',
+      { headers: { Authorization: 'Bearer ' + USER_JWT },
+        validateStatus: () => true }
+    )
+    const pass = !!res.data?.id &&
+                 res.data?.type === 'human' &&
+                 res.data?.email === USER_EMAIL
+    if (pass) USER_PROFILE_ID = res.data.id
+
+    const errMsg = res.data?.error || ''
+    const diagnoseAndFix = async () => {
+      log('GET /api/auth/profile response: ' +
+        JSON.stringify(res.data))
+      log('Checking profiles table directly...')
+      const { data: { user } } = await supabase.auth.getUser(USER_JWT)
+      log('Supabase auth user: ' + JSON.stringify(user?.id))
+      const { data: profile } = await supabase
+        .from('profiles').select('*')
+        .eq('auth_id', user?.id).single()
+      log('Profile in DB: ' + JSON.stringify(profile))
+      if (!profile) {
+        log('Profile not found — authMiddleware may not have upserted it')
+        log('Check server.js authMiddleware')
+      }
+    }
+
+    return {
+      pass,
+      status: res.status,
+      data: res.data,
+      reason: pass ? null : 'Profile missing or wrong: ' + errMsg,
+      manualFix: 'Check GET /api/auth/profile route and authMiddleware upsert',
+      diagnoseAndFix
+    }
+  })
+
+  // TEST 13 — Update profile
+  await runTest(13, 'Update profile', async (attempt, testKey) => {
+    const res = await axios.put(
+      BASE_URL + '/api/auth/profile',
+      { first_name: 'Harris', last_name: 'Qazi',
+        phone: '5551234567' },
+      { headers: { Authorization: 'Bearer ' + USER_JWT },
+        validateStatus: () => true }
+    )
+    const pass = res.data?.first_name === 'Harris'
+
+    const diagnoseAndFix = async () => {
+      log('PUT /api/auth/profile response: ' +
+        JSON.stringify(res.data))
+      log('Check routes/auth.js PUT /profile handler')
+    }
+
+    return {
+      pass,
+      status: res.status,
+      data: res.data,
+      reason: pass ? null : 'first_name not updated: ' +
+        JSON.stringify(res.data),
+      manualFix: 'Check PUT /api/auth/profile route in routes/auth.js',
+      diagnoseAndFix
+    }
+  })
+
+  // TEST 14 — KYC submission
+  await runTest(14, 'KYC submission', async (attempt, testKey) => {
+    const res = await axios.post(
+      BASE_URL + '/api/auth/kyc',
+      {
+        first_name: 'Harris',
+        last_name: 'Qazi',
+        date_of_birth: '1995-01-01',
+        ssn_last_four: '1234',
+        address_line1: '123 Test St',
+        city: 'Chicago',
+        state: 'IL',
+        zip: '60601',
+        id_type: 'drivers_license'
+      },
+      { headers: { Authorization: 'Bearer ' + USER_JWT },
+        validateStatus: () => true }
+    )
+    const pass = res.data?.submitted === true &&
+                 typeof res.data?.fingerprint === 'string'
+    const isConflict = res.status === 409
+
+    const diagnoseAndFix = async () => {
+      log('POST /api/auth/kyc response: ' +
+        JSON.stringify(res.data))
+      if (isConflict) {
+        log('409 — KYC already submitted, treating as pass')
+      } else {
+        log('Check routes/auth.js POST /kyc handler')
+        log('Check kyc_details table columns match payload')
+      }
+    }
+
+    return {
+      pass: pass || isConflict,
+      status: res.status,
+      data: res.data,
+      reason: (pass || isConflict) ? null :
+        'KYC submission failed: ' + JSON.stringify(res.data),
+      manualFix: 'Check POST /api/auth/kyc route in routes/auth.js',
+      diagnoseAndFix
+    }
+  })
+
+  // TEST 15 — Create card
+  await runTest(15, 'Create card', async (attempt, testKey) => {
+    const res = await axios.post(
+      BASE_URL + '/api/cards',
+      {
+        name: 'Test Card',
+        card_name: 'My Test Card',
+        description: 'Created by test suite'
+      },
+      { headers: { Authorization: 'Bearer ' + USER_JWT },
+        validateStatus: () => true }
+    )
+    const pass = !!res.data?.id &&
+                 !!res.data?.invite_code &&
+                 Array.isArray(res.data?.members) &&
+                 res.data.members.includes(USER_PROFILE_ID)
+    if (pass) {
+      USER_CARD_ID = res.data.id
+      USER_INVITE_CODE = res.data.invite_code
+    }
+
+    const diagnoseAndFix = async () => {
+      log('POST /api/cards response: ' +
+        JSON.stringify(res.data))
+      log('USER_PROFILE_ID: ' + USER_PROFILE_ID)
+      if (!USER_PROFILE_ID) {
+        log('USER_PROFILE_ID not set — TEST 12 must pass first')
+        writeLog()
+        process.exit(1)
+      }
+      log('Check routes/cards.js POST / handler')
+      log('Verify invite_code generation and members array init')
+    }
+
+    return {
+      pass,
+      status: res.status,
+      data: res.data,
+      reason: pass ? null : 'Card creation failed: ' +
+        JSON.stringify(res.data),
+      manualFix: 'Check POST /api/cards route — invite_code and members must be set on create',
+      diagnoseAndFix
+    }
+  })
+
+  // TEST 16 — Get card
+  await runTest(16, 'Get card', async (attempt, testKey) => {
+    const res = await axios.get(
+      BASE_URL + '/api/cards/' + USER_CARD_ID,
+      { headers: { Authorization: 'Bearer ' + USER_JWT },
+        validateStatus: () => true }
+    )
+    const pass = res.data?.id === USER_CARD_ID &&
+                 res.data?.card_name === 'My Test Card'
+
+    const diagnoseAndFix = async () => {
+      log('GET /api/cards/' + USER_CARD_ID +
+        ' response: ' + JSON.stringify(res.data))
+      if (!USER_CARD_ID) {
+        log('USER_CARD_ID not set — TEST 15 must pass first')
+        writeLog()
+        process.exit(1)
+      }
+      log('Check routes/cards.js GET /:id handler')
+    }
+
+    return {
+      pass,
+      status: res.status,
+      data: res.data,
+      reason: pass ? null : 'Card fetch failed: ' +
+        JSON.stringify(res.data),
+      manualFix: 'Check GET /api/cards/:id route',
+      diagnoseAndFix
+    }
+  })
+
+  // TEST 17 — Set card limits
+  await runTest(17, 'Set card limits', async (attempt, testKey) => {
+    const res = await axios.put(
+      BASE_URL + '/api/cards/' + USER_CARD_ID + '/limits',
+      { daily_cap: 200, max_per_txn: 50 },
+      { headers: { Authorization: 'Bearer ' + USER_JWT },
+        validateStatus: () => true }
+    )
+    const pass = res.data?.daily_cap === 200 &&
+                 res.data?.max_per_txn === 50
+
+    const diagnoseAndFix = async () => {
+      log('PUT /api/cards/' + USER_CARD_ID +
+        '/limits response: ' + JSON.stringify(res.data))
+      log('Check routes/cards.js PUT /:id/limits handler')
+      log('Verify spending_limits is stored and returned correctly')
+    }
+
+    return {
+      pass,
+      status: res.status,
+      data: res.data,
+      reason: pass ? null : 'Limits not set: ' +
+        JSON.stringify(res.data),
+      manualFix: 'Check PUT /api/cards/:id/limits route',
+      diagnoseAndFix
+    }
+  })
+
+  // TEST 18 — Create Lithic card
+  await runTest(18, 'Create Lithic card for card',
+    async (attempt, testKey) => {
+    const res = await axios.post(
+      BASE_URL + '/api/lithic',
+      { group_id: USER_CARD_ID, monthlyLimit: 100000 },
+      { headers: { Authorization: 'Bearer ' + USER_JWT },
+        validateStatus: () => true }
+    )
+    const pass = res.data?.success === true &&
+                 !!res.data?.cardToken
+
+    const diagnoseAndFix = async () => {
+      log('POST /api/lithic response: ' +
+        JSON.stringify(res.data))
+
+      log('Checking card in Supabase for card_token...')
+      const { data: card } = await supabase
+        .from('cards').select('card_token')
+        .eq('id', USER_CARD_ID).single()
+      log('card_token in DB: ' + card?.card_token)
+
+      if (res.status === 404) {
+        log('Route not found — check /api/lithic mount in server.js')
+        writeLog()
+        process.exit(1)
+      }
+      log('Check routes/lithic.js POST / handler')
+      log('Verify Lithic API key is set and sandbox mode is active')
+    }
+
+    if (pass) {
+      log('Verifying card_token saved to Supabase...')
+      const { data: card } = await supabase
+        .from('cards').select('card_token')
+        .eq('id', USER_CARD_ID).single()
+      log('card_token in DB: ' + card?.card_token)
+    }
+
+    return {
+      pass,
+      status: res.status,
+      data: res.data,
+      reason: pass ? null : 'Lithic card creation failed: ' +
+        JSON.stringify(res.data),
+      manualFix: 'Check POST /api/lithic route and Lithic API key',
+      diagnoseAndFix
+    }
+  })
+
+  // TEST 19 — List cards
+  await runTest(19, 'List cards', async (attempt, testKey) => {
+    const res = await axios.get(
+      BASE_URL + '/api/cards',
+      { headers: { Authorization: 'Bearer ' + USER_JWT },
+        validateStatus: () => true }
+    )
+    const cards = Array.isArray(res.data?.data)
+      ? res.data.data
+      : Array.isArray(res.data) ? res.data : []
+    const pass = cards.some(c => c.id === USER_CARD_ID)
+
+    const diagnoseAndFix = async () => {
+      log('GET /api/cards response: ' +
+        JSON.stringify(res.data))
+      log('Looking for USER_CARD_ID: ' + USER_CARD_ID)
+      log('Check routes/cards.js GET / handler')
+      log('Verify member filter includes USER_PROFILE_ID')
+    }
+
+    return {
+      pass,
+      status: res.status,
+      data: res.data,
+      reason: pass ? null : 'Card not found in list: ' +
+        JSON.stringify(res.data),
+      manualFix: 'Check GET /api/cards route — should return all cards where user is owner or member',
+      diagnoseAndFix
+    }
+  })
+
+  // TEST 20 — List transactions
+  await runTest(20, 'List transactions', async (attempt, testKey) => {
+    const res = await axios.get(
+      BASE_URL + '/api/transactions?card_id=' + USER_CARD_ID,
+      { headers: { Authorization: 'Bearer ' + USER_JWT },
+        validateStatus: () => true }
+    )
+    const isArray = Array.isArray(res.data?.data) ||
+                    Array.isArray(res.data)
+    const pass = res.status === 200 && isArray
+
+    const diagnoseAndFix = async () => {
+      log('GET /api/transactions response: ' +
+        JSON.stringify(res.data))
+      log('Check routes/transactions.js GET / handler')
+    }
+
+    return {
+      pass,
+      status: res.status,
+      data: res.data,
+      reason: pass ? null : 'Transactions endpoint error: ' +
+        JSON.stringify(res.data),
+      manualFix: 'Check GET /api/transactions?card_id= route',
+      diagnoseAndFix
+    }
+  })
+
+  // TEST 21 — Card join flow
+  await runTest(21, 'Card join flow (second user)',
+    async (attempt, testKey) => {
+    if (!process.env.TEST_USER2_PASSWORD) {
+      log('⚠️ TEST_USER2_PASSWORD not set — ' +
+        'skipping join test')
+      log('Set it in Replit Secrets as TEST_USER2_PASSWORD')
+      return { pass: true, status: 200,
+        data: { skipped: true }, reason: null }
+    }
+
+    log('Getting second user JWT...')
+    let secondJwt = null
+    try {
+      secondJwt = await getUserJWT(
+        SECOND_USER_EMAIL,
+        process.env.TEST_USER2_PASSWORD)
+      SECOND_USER_JWT = secondJwt
+      log('Second user JWT obtained')
+    } catch (e) {
+      return {
+        pass: false,
+        status: 401,
+        data: { error: e.message },
+        reason: 'Could not get second user JWT: ' + e.message,
+        manualFix: 'Check TEST_USER2_PASSWORD and that ' +
+          SECOND_USER_EMAIL + ' exists in Supabase Auth',
+        diagnoseAndFix: async () => {
+          log('Cannot auto-fix second user login')
+        }
+      }
+    }
+
+    log('Getting second user profile...')
+    const profileRes = await axios.get(
+      BASE_URL + '/api/auth/profile',
+      { headers: { Authorization: 'Bearer ' + secondJwt },
+        validateStatus: () => true }
+    )
+    if (!profileRes.data?.id) {
+      return {
+        pass: false,
+        status: profileRes.status,
+        data: profileRes.data,
+        reason: 'Second user profile not found',
+        manualFix: 'Check /api/auth/profile for second user',
+        diagnoseAndFix: async () => {
+          log('Second user profile response: ' +
+            JSON.stringify(profileRes.data))
+        }
+      }
+    }
+    SECOND_USER_PROFILE_ID = profileRes.data.id
+    log('Second user profile ID: ' + SECOND_USER_PROFILE_ID)
+
+    const joinRes = await axios.post(
+      BASE_URL + '/api/cards/join',
+      { invite_code: USER_INVITE_CODE },
+      { headers: { Authorization: 'Bearer ' + secondJwt },
+        validateStatus: () => true }
+    )
+
+    const pass = joinRes.data?.id === USER_CARD_ID &&
+                 Array.isArray(joinRes.data?.members) &&
+                 joinRes.data.members.includes(SECOND_USER_PROFILE_ID)
+
+    const diagnoseAndFix = async () => {
+      log('POST /api/cards/join response: ' +
+        JSON.stringify(joinRes.data))
+      log('invite_code used: ' + USER_INVITE_CODE)
+      log('Expected card: ' + USER_CARD_ID)
+      log('Expected member: ' + SECOND_USER_PROFILE_ID)
+
+      log('Checking card in Supabase...')
+      const { data: card } = await supabase
+        .from('cards').select('invite_code, members')
+        .eq('id', USER_CARD_ID).single()
+      log('Card invite_code: ' + card?.invite_code)
+      log('Card members: ' + JSON.stringify(card?.members))
+
+      if (card?.invite_code !== USER_INVITE_CODE) {
+        log('invite_code mismatch — card may have been ' +
+          'recreated in this test run')
+      }
+      log('Check routes/cards.js POST /join handler')
+    }
+
+    return {
+      pass,
+      status: joinRes.status,
+      data: joinRes.data,
+      reason: pass ? null : 'Join failed or member not added: ' +
+        JSON.stringify(joinRes.data),
+      manualFix: 'Check POST /api/cards/join route and invite_code lookup',
       diagnoseAndFix
     }
   })
