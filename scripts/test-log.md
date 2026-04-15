@@ -1,8 +1,8 @@
 # Pooly Auto-Test Log
-Generated: 2026-04-15T00:40:49.699Z
+Generated: 2026-04-15T00:49:36.364Z
 
 # Pooly Auto-Test Log
-Started: 2026-04-15T00:40:37.387Z
+Started: 2026-04-15T00:49:20.894Z
 BASE_URL: https://8e840236-9463-41e3-838e-7c1a148ad062-00-1lm822cdti16a.kirk.replit.dev
 CARD_ID: b99854e1-a8a6-4165-a065-44320457b117
 AGENT_PROFILE_ID: c2d7497e-33dc-4c2b-9c32-d167268aebc6
@@ -30,7 +30,7 @@ AGENT_PROFILE_ID: c2d7497e-33dc-4c2b-9c32-d167268aebc6
 ✅ PASS: Health check
 Response: {
   "status": "POOLY BACKEND LIVE",
-  "time": "2026-04-15T00:40:38.518Z",
+  "time": "2026-04-15T00:49:22.449Z",
   "providers": {
     "card_issuer": "lithic",
     "bank_rails": "modern_treasury",
@@ -42,11 +42,11 @@ Response: {
 === TEST 2: Agent token issuance ===
 --- Attempt 1 of 5 ---
 AGENT_TOKEN saved (first 30 chars): eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
-TOKEN_HASH: 7eb4c38dde72ebd25530cb87c5271e62825af750ad4da0a0a14bc875b25a0863
+TOKEN_HASH: 43693293bbc96d9bd29515de7930f8bae7f3e517b955547bd5842b2c0b9edaa5
 ✅ PASS: Agent token issuance
 Response: {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9maWxlX2lkIjoiYzJkNzQ5N2UtMzNkYy00YzJiLTljMzItZDE2NzI2OGFlYmM2IiwiY2FyZF9pZCI6ImI5OTg1NGUxLWE4YTYtNDE2NS1hMDY1LTQ0MzIwNDU3YjExNyIsInR5cGUiOiJhZ2VudCIsImlhdCI6MTc3NjIxMzYzOCwiZXhwIjoxNzc2MjE3MjM4fQ.ZO47n8ry7elzpQH6FGP6wB1pGswtMbRpt8Bmaot_Xqs",
-  "expires_at": "2026-04-15T01:40:38.850Z",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwcm9maWxlX2lkIjoiYzJkNzQ5N2UtMzNkYy00YzJiLTljMzItZDE2NzI2OGFlYmM2IiwiY2FyZF9pZCI6ImI5OTg1NGUxLWE4YTYtNDE2NS1hMDY1LTQ0MzIwNDU3YjExNyIsInR5cGUiOiJhZ2VudCIsImlhdCI6MTc3NjIxNDE2MywiZXhwIjoxNzc2MjE3NzYzfQ.KTRAfkzuWN1eU9_2oUf9Ijj4qa-BTgyW5nE_iMHtDdM",
+  "expires_at": "2026-04-15T01:49:23.063Z",
   "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6"
 }
 
@@ -57,8 +57,8 @@ Response: {
   "approved": true,
   "amount_dollars": 5,
   "provider": "lithic",
-  "provider_ref": "9754f869-5482-44f3-a4d3-eaf303c8b15a_agent_txn_1776213639885",
-  "transaction_id": "a7f34699-e2d9-42de-b154-621896c0b119",
+  "provider_ref": "9754f869-5482-44f3-a4d3-eaf303c8b15a_agent_txn_1776214164365",
+  "transaction_id": "12e42a1d-98bb-4822-983a-b58819f1c9cf",
   "anomaly_flagged": false
 }
 
@@ -75,6 +75,44 @@ Response: {
 ✅ PASS: Spend log
 Response: {
   "data": [
+    {
+      "id": "d5b330ea-c15b-4baa-9958-d7962a67cde1",
+      "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
+      "token_hash": "43693293bbc96d9bd29515de7930f8bae7f3e517b955547bd5842b2c0b9edaa5",
+      "amount": 5000,
+      "merchant_name": "Test Merchant",
+      "mcc": null,
+      "memo": "Over cap test",
+      "status": "blocked",
+      "provider": null,
+      "anomaly_flag": false,
+      "block_reason": "per_txn_cap",
+      "created_at": "2026-04-15T00:49:25.997744+00:00",
+      "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6",
+      "amount_dollars": 50,
+      "agent_name": "gpt4-purchasing-bot",
+      "model_name": "gpt-4o",
+      "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
+    },
+    {
+      "id": "08616878-f3ca-4f12-ba3f-ec7e61d57442",
+      "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
+      "token_hash": "43693293bbc96d9bd29515de7930f8bae7f3e517b955547bd5842b2c0b9edaa5",
+      "amount": 500,
+      "merchant_name": "Test Merchant",
+      "mcc": null,
+      "memo": "Test payment",
+      "status": "approved",
+      "provider": "lithic",
+      "anomaly_flag": false,
+      "block_reason": null,
+      "created_at": "2026-04-15T00:49:25.180339+00:00",
+      "profile_id": "c2d7497e-33dc-4c2b-9c32-d167268aebc6",
+      "amount_dollars": 5,
+      "agent_name": "gpt4-purchasing-bot",
+      "model_name": "gpt-4o",
+      "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
+    },
     {
       "id": "8f5c7602-9c31-4a88-bb68-5044f5f3a66e",
       "card_id": "b99854e1-a8a6-4165-a065-44320457b117",
@@ -532,7 +570,7 @@ Response: {
       "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d"
     }
   ],
-  "total_count": 24,
+  "total_count": 26,
   "limit": 50,
   "offset": 0
 }
@@ -550,11 +588,11 @@ Response: {
       "fingerprint": "14f8a1a2e7fbc3f2fc6d9eeaa8935fffa195331858a80d1f4e3ad53c39cca47d",
       "kyc_status": "approved",
       "risk_level": "low",
-      "total_spent_dollars": 60,
-      "transaction_count": 12,
-      "blocked_count": 12,
+      "total_spent_dollars": 65,
+      "transaction_count": 13,
+      "blocked_count": 13,
       "anomaly_count": 0,
-      "last_seen": "2026-04-15T00:40:41.645654+00:00",
+      "last_seen": "2026-04-15T00:49:25.997744+00:00",
       "flagged": true
     }
   ]
@@ -572,9 +610,9 @@ Response: {
       "email": null,
       "current_ip": "127.0.0.1",
       "kyc_status": "approved",
-      "anomaly_count": 28,
-      "total_risk_score": 530,
-      "last_anomaly": "2026-04-15T00:40:41.790244+00:00",
+      "anomaly_count": 31,
+      "total_risk_score": 760,
+      "last_anomaly": "2026-04-15T00:49:26.118286+00:00",
       "anomaly_types": [
         "blocked_pattern",
         "duplicate_charge",
@@ -628,7 +666,7 @@ Response: {
       "phone": null,
       "current_ip": "127.0.0.1",
       "last_seen_ip": null,
-      "last_seen": "2026-04-15T00:40:40.723+00:00",
+      "last_seen": "2026-04-15T00:49:25.236+00:00",
       "model_name": "gpt-4o",
       "model_version": "2024-11",
       "system_prompt_hash": "39e5573d66dbe5b1e09f7630a85b9f0e7f77660fca92ad1cd999628614e081b6",
@@ -692,18 +730,18 @@ Response: {
   "phone": "5551234567",
   "current_ip": "127.0.0.1",
   "last_seen_ip": "127.0.0.1",
-  "last_seen": "2026-04-15T00:40:22.458+00:00",
+  "last_seen": "2026-04-15T00:40:49.283+00:00",
   "model_name": null,
   "model_version": null,
   "system_prompt_hash": null,
   "owner_id": null,
   "kyc_status": "pending",
-  "kyc_submitted_at": "2026-04-15T00:40:19.032+00:00",
+  "kyc_submitted_at": "2026-04-15T00:40:45.547+00:00",
   "kyc_approved_at": null,
   "status": "active",
   "suspension_reason": null,
   "created_at": "2026-04-13T18:48:28.026427+00:00",
-  "updated_at": "2026-04-15T00:40:18.351+00:00",
+  "updated_at": "2026-04-15T00:40:44.78+00:00",
   "kyc": {
     "id": "6ae5ceba-9eba-47ab-8e0a-c3cb225dad26",
     "profile_id": "5fe6ba1e-f02b-400f-959c-8442532396f8",
@@ -724,7 +762,7 @@ Response: {
     "model_card_url": null,
     "intended_use": null,
     "risk_level": "low",
-    "submitted_at": "2026-04-15T00:40:18.911+00:00",
+    "submitted_at": "2026-04-15T00:40:45.438+00:00",
     "reviewed_at": null,
     "reviewed_by": null,
     "created_at": "2026-04-13T18:48:29.512204+00:00",
@@ -745,18 +783,18 @@ Response: {
   "phone": "5551234567",
   "current_ip": "127.0.0.1",
   "last_seen_ip": "127.0.0.1",
-  "last_seen": "2026-04-15T00:40:44.667+00:00",
+  "last_seen": "2026-04-15T00:49:29.383+00:00",
   "model_name": null,
   "model_version": null,
   "system_prompt_hash": null,
   "owner_id": null,
   "kyc_status": "pending",
-  "kyc_submitted_at": "2026-04-15T00:40:19.032+00:00",
+  "kyc_submitted_at": "2026-04-15T00:40:45.547+00:00",
   "kyc_approved_at": null,
   "status": "active",
   "suspension_reason": null,
   "created_at": "2026-04-13T18:48:28.026427+00:00",
-  "updated_at": "2026-04-15T00:40:44.78+00:00"
+  "updated_at": "2026-04-15T00:49:29.519+00:00"
 }
 
 === TEST 14: KYC submission ===
@@ -773,10 +811,10 @@ Cleaning up duplicate test cards...
 Cleanup done
 ✅ PASS: Create card
 Response: {
-  "id": "8d1cdc5b-e0a3-40ae-b19e-b93f9195a647",
+  "id": "1d2ea548-bfbc-4844-9cb2-728d46be8a02",
   "name": "Test Card",
   "description": "Created by test suite",
-  "group_code": "981101C6C11A",
+  "group_code": "F5126C32276E",
   "owner_id": "79ad6c1b-d44d-4470-98e1-be337e519999",
   "member_ids": null,
   "approval_threshold": 1,
@@ -789,8 +827,8 @@ Response: {
   "blocked_mcc": [],
   "card_status": "active",
   "card_image_url": null,
-  "created_at": "2026-04-15T00:40:46.301233+00:00",
-  "updated_at": "2026-04-15T00:40:46.301233+00:00",
+  "created_at": "2026-04-15T00:49:31.223229+00:00",
+  "updated_at": "2026-04-15T00:49:31.223229+00:00",
   "admin_ids": [],
   "allowed_merchants": [],
   "merchant_restriction_mode": "blacklist",
@@ -801,17 +839,17 @@ Response: {
   "members": [
     "5fe6ba1e-f02b-400f-959c-8442532396f8"
   ],
-  "invite_code": "981101C6C11A"
+  "invite_code": "F5126C32276E"
 }
 
 === TEST 16: Get card ===
 --- Attempt 1 of 5 ---
 ✅ PASS: Get card
 Response: {
-  "id": "8d1cdc5b-e0a3-40ae-b19e-b93f9195a647",
+  "id": "1d2ea548-bfbc-4844-9cb2-728d46be8a02",
   "name": "Test Card",
   "description": "Created by test suite",
-  "group_code": "981101C6C11A",
+  "group_code": "F5126C32276E",
   "owner_id": "79ad6c1b-d44d-4470-98e1-be337e519999",
   "member_ids": null,
   "approval_threshold": 1,
@@ -824,8 +862,8 @@ Response: {
   "blocked_mcc": [],
   "card_status": "active",
   "card_image_url": null,
-  "created_at": "2026-04-15T00:40:46.301233+00:00",
-  "updated_at": "2026-04-15T00:40:46.301233+00:00",
+  "created_at": "2026-04-15T00:49:31.223229+00:00",
+  "updated_at": "2026-04-15T00:49:31.223229+00:00",
   "admin_ids": [],
   "allowed_merchants": [],
   "merchant_restriction_mode": "blacklist",
@@ -836,7 +874,7 @@ Response: {
   "members": [
     "5fe6ba1e-f02b-400f-959c-8442532396f8"
   ],
-  "invite_code": "981101C6C11A"
+  "invite_code": "F5126C32276E"
 }
 
 === TEST 17: Set card limits ===
@@ -850,11 +888,11 @@ Response: {
 === TEST 18: Create Lithic card for card ===
 --- Attempt 1 of 5 ---
 Verifying card_token saved to Supabase...
-card_token in DB: 11a9f9f3-5369-40d8-bd66-c060bcd70902
+card_token in DB: c3adcd5e-de33-4819-8041-234d5fc8e1ca
 ✅ PASS: Create Lithic card for card
 Response: {
   "success": true,
-  "cardToken": "11a9f9f3-5369-40d8-bd66-c060bcd70902",
+  "cardToken": "c3adcd5e-de33-4819-8041-234d5fc8e1ca",
   "message": "Virtual card created for group"
 }
 
@@ -863,10 +901,10 @@ Response: {
 ✅ PASS: List cards
 Response: [
   {
-    "id": "8d1cdc5b-e0a3-40ae-b19e-b93f9195a647",
+    "id": "1d2ea548-bfbc-4844-9cb2-728d46be8a02",
     "name": "Test Card",
     "description": "Created by test suite",
-    "group_code": "981101C6C11A",
+    "group_code": "F5126C32276E",
     "owner_id": "79ad6c1b-d44d-4470-98e1-be337e519999",
     "member_ids": null,
     "approval_threshold": 1,
@@ -879,19 +917,19 @@ Response: [
     "blocked_mcc": [],
     "card_status": "OPEN",
     "card_image_url": null,
-    "created_at": "2026-04-15T00:40:46.301233+00:00",
-    "updated_at": "2026-04-15T00:40:48.350788+00:00",
+    "created_at": "2026-04-15T00:49:31.223229+00:00",
+    "updated_at": "2026-04-15T00:49:33.31904+00:00",
     "admin_ids": [],
     "allowed_merchants": [],
     "merchant_restriction_mode": "blacklist",
     "merchant_limits": [],
-    "card_token": "11a9f9f3-5369-40d8-bd66-c060bcd70902",
+    "card_token": "c3adcd5e-de33-4819-8041-234d5fc8e1ca",
     "card_name": "My Test Card",
     "agent_ids": [],
     "members": [
       "5fe6ba1e-f02b-400f-959c-8442532396f8"
     ],
-    "invite_code": "981101C6C11A"
+    "invite_code": "F5126C32276E"
   }
 ]
 
@@ -902,13 +940,43 @@ Response: []
 
 === TEST 21: Card join flow (second user) ===
 --- Attempt 1 of 5 ---
-⚠️ TEST_USER2_EMAIL not set — skipping join test
-⚠️ TEST_USER2_PASSWORD not set — skipping join test
-Set both in Replit Secrets and re-run
+Getting second user JWT for: test3@pooly.com
+Second user JWT obtained
+Getting second user profile...
+Second user profile ID: 407d9b94-5ff1-4343-9ecc-c5d3501247e9
+Joining card with invite_code: F5126C32276E
+Verifying membership in Supabase...
+DB members: "[\"5fe6ba1e-f02b-400f-959c-8442532396f8\",\"407d9b94-5ff1-4343-9ecc-c5d3501247e9\"]"
 ✅ PASS: Card join flow (second user)
 Response: {
-  "skipped": true
+  "id": "1d2ea548-bfbc-4844-9cb2-728d46be8a02",
+  "name": "Test Card",
+  "description": "Created by test suite",
+  "group_code": "F5126C32276E",
+  "owner_id": "79ad6c1b-d44d-4470-98e1-be337e519999",
+  "member_ids": null,
+  "approval_threshold": 1,
+  "total_balance": 0,
+  "member_balances": {},
+  "spending_limits": {
+    "daily_cap": 20000,
+    "max_per_txn": 5000
+  },
+  "blocked_mcc": [],
+  "card_status": "OPEN",
+  "card_image_url": null,
+  "created_at": "2026-04-15T00:49:31.223229+00:00",
+  "updated_at": "2026-04-15T00:49:36.167559+00:00",
+  "admin_ids": [],
+  "allowed_merchants": [],
+  "merchant_restriction_mode": "blacklist",
+  "merchant_limits": [],
+  "card_token": "c3adcd5e-de33-4819-8041-234d5fc8e1ca",
+  "card_name": "My Test Card",
+  "agent_ids": [],
+  "members": "[\"5fe6ba1e-f02b-400f-959c-8442532396f8\",\"407d9b94-5ff1-4343-9ecc-c5d3501247e9\"]",
+  "invite_code": "F5126C32276E"
 }
 
 🎉 ALL TESTS PASSED
-Completed: 2026-04-15T00:40:49.699Z
+Completed: 2026-04-15T00:49:36.364Z
