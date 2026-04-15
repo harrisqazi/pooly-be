@@ -16,7 +16,7 @@ const AGENT_PROFILE_ID = 'c2d7497e-33dc-4c2b-9c32-d167268aebc6'
 const HUMAN_PROFILE_ID = 'ecbd07cb-9227-421a-91e2-24f22a20e7da'
 const USER_EMAIL = process.env.TEST_USER_EMAIL
 const USER_PASSWORD = process.env.TEST_USER_PASSWORD
-const SECOND_USER_EMAIL = 'harisqazi@yahoo.com'
+const SECOND_USER_EMAIL = process.env.TEST_USER2_EMAIL
 const LOG_FILE = path.join(__dirname, 'test-log.md')
 const MAX_ATTEMPTS = 5
 
@@ -1374,20 +1374,21 @@ ORDER BY total_risk_score DESC;`)
   // TEST 21 — Card join flow
   await runTest(21, 'Card join flow (second user)',
     async (attempt, testKey) => {
-    if (!process.env.TEST_USER2_PASSWORD) {
-      log('⚠️ TEST_USER2_PASSWORD not set — ' +
-        'skipping join test')
-      log('Set it in Replit Secrets as TEST_USER2_PASSWORD')
+    const user2Email = process.env.TEST_USER2_EMAIL
+    const user2Password = process.env.TEST_USER2_PASSWORD
+
+    if (!user2Email || !user2Password) {
+      if (!user2Email) log('⚠️ TEST_USER2_EMAIL not set — skipping join test')
+      if (!user2Password) log('⚠️ TEST_USER2_PASSWORD not set — skipping join test')
+      log('Set both in Replit Secrets and re-run')
       return { pass: true, status: 200,
         data: { skipped: true }, reason: null }
     }
 
-    log('Getting second user JWT...')
+    log('Getting second user JWT for: ' + user2Email)
     let secondJwt = null
     try {
-      secondJwt = await getUserJWT(
-        SECOND_USER_EMAIL,
-        process.env.TEST_USER2_PASSWORD)
+      secondJwt = await getUserJWT(user2Email, user2Password)
       SECOND_USER_JWT = secondJwt
       log('Second user JWT obtained')
     } catch (e) {
@@ -1397,9 +1398,10 @@ ORDER BY total_risk_score DESC;`)
         data: { error: e.message },
         reason: 'Could not get second user JWT: ' + e.message,
         manualFix: 'Check TEST_USER2_PASSWORD and that ' +
-          SECOND_USER_EMAIL + ' exists in Supabase Auth',
+          user2Email + ' exists in Supabase Auth',
         diagnoseAndFix: async () => {
           log('Cannot auto-fix second user login')
+          log('Email attempted: ' + user2Email)
         }
       }
     }
@@ -1426,6 +1428,7 @@ ORDER BY total_risk_score DESC;`)
     SECOND_USER_PROFILE_ID = profileRes.data.id
     log('Second user profile ID: ' + SECOND_USER_PROFILE_ID)
 
+    log('Joining card with invite_code: ' + USER_INVITE_CODE)
     const joinRes = await axios.post(
       BASE_URL + '/api/cards/join',
       { invite_code: USER_INVITE_CODE },
@@ -1433,9 +1436,22 @@ ORDER BY total_risk_score DESC;`)
         validateStatus: () => true }
     )
 
+    const joinedMembers = Array.isArray(joinRes.data?.members)
+      ? joinRes.data.members
+      : (typeof joinRes.data?.members === 'string'
+        ? JSON.parse(joinRes.data.members)
+        : [])
+
     const pass = joinRes.data?.id === USER_CARD_ID &&
-                 Array.isArray(joinRes.data?.members) &&
-                 joinRes.data.members.includes(SECOND_USER_PROFILE_ID)
+                 joinedMembers.includes(SECOND_USER_PROFILE_ID)
+
+    if (pass) {
+      log('Verifying membership in Supabase...')
+      const { data: card } = await supabase
+        .from('cards').select('members')
+        .eq('id', USER_CARD_ID).single()
+      log('DB members: ' + JSON.stringify(card?.members))
+    }
 
     const diagnoseAndFix = async () => {
       log('POST /api/cards/join response: ' +
@@ -1443,6 +1459,7 @@ ORDER BY total_risk_score DESC;`)
       log('invite_code used: ' + USER_INVITE_CODE)
       log('Expected card: ' + USER_CARD_ID)
       log('Expected member: ' + SECOND_USER_PROFILE_ID)
+      log('Members parsed: ' + JSON.stringify(joinedMembers))
 
       log('Checking card in Supabase...')
       const { data: card } = await supabase
