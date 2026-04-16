@@ -11,7 +11,16 @@ const { supabase } = require('./config/providers');
 const app = express();
 app.set('trust proxy', 1);
 app.use(helmet());
-app.use(cors({ origin: [/vercel\.app$/, /localhost/] }));
+app.use(cors({
+  origin: [
+    'https://pooly-fe.vercel.app',
+    'https://pooly-fe-harrisqazi.vercel.app',
+    'https://*.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 }));
 
