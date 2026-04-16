@@ -54,6 +54,7 @@ const transfersRoutes = require('./routes/transfers');
 const topupsRoutes = require('./routes/topups');
 const webhooksRoutes = require('./routes/webhooks');
 const agentRoutes = require('./routes/agent');
+const stripeRoutes = require('./routes/stripe');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/cards', cardsRoutes);
@@ -63,6 +64,7 @@ app.use('/api/transfers', transfersRoutes);
 app.use('/api/topups', topupsRoutes);
 app.use('/api/webhooks', webhooksRoutes);
 app.use('/api/agent', agentRoutes);
+app.use('/api/stripe', stripeRoutes);
 
 // ========= POST /api/cards/create (Lithic virtual card) =========
 app.post('/api/cards/create', async (req, res) => {
