@@ -248,17 +248,19 @@ async function anomalyDetection(req, res, next) {
 // POST /api/agent/register
 // ─────────────────────────────────────────────────────────────
 
-router.post('/register', verifyAdminKey, async (req, res) => {
+const authMiddleware = require('../middleware/auth');
+
+router.post('/register', authMiddleware, async (req, res) => {
   try {
-    const { card_id, agent_name, model_name, model_version, system_prompt, owner_auth_id } = req.body;
-    if (!card_id || !agent_name || !model_name || !system_prompt || !owner_auth_id) {
-      return res.status(400).json({ error: 'card_id, agent_name, model_name, system_prompt, owner_auth_id required' });
+    const { card_id, agent_name, model_name, model_version, system_prompt } = req.body;
+    if (!card_id || !agent_name || !model_name || !system_prompt) {
+      return res.status(400).json({ error: 'card_id, agent_name, model_name, system_prompt required' });
     }
 
     const { data: owner } = await supabase
       .from('profiles')
       .select('*')
-      .eq('auth_id', owner_auth_id)
+      .eq('auth_id', req.user.id)
       .single();
 
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
