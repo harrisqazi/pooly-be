@@ -12,14 +12,21 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(helmet());
 const corsOptions = {
-  origin: [
-    'https://pooly-fe.vercel.app',
-    'https://pooly-fe-harrisqazi.vercel.app',
-    'https://*.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ],
-  credentials: true
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true)
+    if (
+      origin.endsWith('.vercel.app') ||
+      origin === 'http://localhost:5173' ||
+      origin === 'http://localhost:3000'
+    ) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
