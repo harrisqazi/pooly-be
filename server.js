@@ -164,16 +164,7 @@ app.get('/cards', async (req, res) => {
   res.json(data || []);
 });
 
-app.get('/approvals', async (req, res) => {
-  if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*, cards(name), approvals(*)')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false });
-  if (error) return res.status(500).json(error);
-  res.json(data || []);
-});
+// Approvals are served at GET /api/transactions/approvals (routes/transactions.js)
 
 // ========= TEST ROUTES =========
 app.get('/api/lithic/test', async (req, res) => {
