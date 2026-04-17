@@ -5,6 +5,31 @@ const router = express.Router();
 const { supabase, lithic, PROVIDER_ISSUING } = require('../config/providers');
 
 /**
+ * Get Lithic card details directly by card_token
+ * GET /api/lithic/card-details?card_token=xxx
+ */
+router.get('/card-details', async (req, res) => {
+  try {
+    const { card_token } = req.query
+    if (!card_token) {
+      return res.status(400).json({ error: 'card_token required' })
+    }
+    const card = await lithic.cards.retrieve(card_token)
+    return res.json({
+      last_four: card.last_four,
+      exp_month: card.exp_month,
+      exp_year: card.exp_year,
+      state: card.state,
+      type: card.type,
+      spend_limit: card.spend_limit,
+      spend_limit_duration: card.spend_limit_duration
+    })
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
  * Get Lithic card details for a wallet card
  * GET /api/lithic/:id
  */
