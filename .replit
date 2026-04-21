@@ -55,6 +55,7 @@ TEST_USER_EMAIL = "test@pooly.com"
 TEST_USER_PASSWORD = "test"
 TEST_USER2_EMAIL = "test3@pooly.com"
 TEST_USER2_PASSWORD = "test3"
+GITHUB_TOKEN = "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"
 
 [userenv.development]
 
