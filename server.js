@@ -66,6 +66,63 @@ app.use('/api/webhooks', webhooksRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/stripe', stripeRoutes);
 
+app.get('/api/mcc/search', (req, res) => {
+  const merchantMCC = [
+    { name: 'Walmart', mcc: '5310', category: 'Discount Stores' },
+    { name: 'Kroger', mcc: '5411', category: 'Grocery Stores' },
+    { name: 'Target', mcc: '5311', category: 'Department Stores' },
+    { name: 'Amazon', mcc: '5999', category: 'Online Retail' },
+    { name: 'Uber', mcc: '4121', category: 'Rideshare' },
+    { name: 'Lyft', mcc: '4121', category: 'Rideshare' },
+    { name: 'DoorDash', mcc: '5812', category: 'Restaurants' },
+    { name: 'Grubhub', mcc: '5812', category: 'Restaurants' },
+    { name: 'Netflix', mcc: '7841', category: 'Streaming' },
+    { name: 'Spotify', mcc: '7929', category: 'Entertainment' },
+    { name: 'Apple', mcc: '5065', category: 'Electronics' },
+    { name: 'Google', mcc: '7372', category: 'Software' },
+    { name: 'OpenAI', mcc: '7372', category: 'Software' },
+    { name: 'Anthropic', mcc: '7372', category: 'Software' },
+    { name: 'Stripe', mcc: '7372', category: 'Software' },
+    { name: 'Shopify', mcc: '7372', category: 'Software' },
+    { name: 'Costco', mcc: '5300', category: 'Wholesale' },
+    { name: 'CVS', mcc: '5912', category: 'Drug Stores' },
+    { name: 'Walgreens', mcc: '5912', category: 'Drug Stores' },
+    { name: 'Starbucks', mcc: '5812', category: 'Restaurants' },
+    { name: 'McDonalds', mcc: '5812', category: 'Restaurants' },
+    { name: 'Gas Station', mcc: '5541', category: 'Gas Stations' },
+    { name: 'Shell', mcc: '5541', category: 'Gas Stations' },
+    { name: 'BP', mcc: '5541', category: 'Gas Stations' },
+    { name: 'Hotels', mcc: '7011', category: 'Hotels' },
+    { name: 'Airbnb', mcc: '7011', category: 'Hotels' },
+    { name: 'Airlines', mcc: '3000', category: 'Airlines' },
+    { name: 'Delta Airlines', mcc: '3058', category: 'Airlines' },
+    { name: 'American Airlines', mcc: '3001', category: 'Airlines' },
+    { name: 'United Airlines', mcc: '3020', category: 'Airlines' },
+    { name: 'Grocery Store', mcc: '5411', category: 'Grocery Stores' },
+    { name: 'Restaurant', mcc: '5812', category: 'Restaurants' },
+    { name: 'Fast Food', mcc: '5814', category: 'Fast Food' },
+    { name: 'Pharmacy', mcc: '5912', category: 'Drug Stores' },
+    { name: 'Gambling', mcc: '7995', category: 'Gambling' },
+    { name: 'Liquor Store', mcc: '5921', category: 'Liquor' },
+    { name: 'Subscription Services', mcc: '7372', category: 'Software' },
+    { name: 'Office Supplies', mcc: '5112', category: 'Office' },
+    { name: 'Advertising', mcc: '7311', category: 'Marketing' },
+    { name: 'Cloud Services', mcc: '7372', category: 'Software' }
+  ];
+
+  const query = (req.query.name || '').trim().toLowerCase();
+
+  if (!query) return res.json(merchantMCC);
+
+  const results = merchantMCC.filter(m =>
+    m.name.toLowerCase().includes(query) ||
+    m.category.toLowerCase().includes(query) ||
+    m.mcc.includes(query)
+  );
+
+  return res.json(results);
+});
+
 // ========= POST /api/cards/create (Lithic virtual card) =========
 app.post('/api/cards/create', async (req, res) => {
   try {

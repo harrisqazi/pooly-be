@@ -306,28 +306,31 @@ router.post('/register', authMiddleware, async (req, res) => {
       risk_level: 'medium'
     });
 
-    // Add agent to card members
-    const { data: currentCard } = await supabase
-      .from('cards')
-      .select('members')
-      .eq('id', card_id)
-      .single();
+    if (card_id) {
+      const { data: card } = await supabase
+        .from('cards')
+        .select('members')
+        .eq('id', card_id)
+        .single();
 
-    const currentMembers = Array.isArray(currentCard?.members)
-      ? currentCard.members
-      : [];
+      const currentMembers = Array.isArray(card?.members)
+        ? card.members
+        : JSON.parse(card?.members || '[]');
 
-    if (!currentMembers.includes(agentProfile.id)) {
-      currentMembers.push(agentProfile.id);
-    }
+      const nextMembers = currentMembers.includes(agentProfile.id)
+        ? currentMembers
+        : [...currentMembers, agentProfile.id];
 
-    const { error: memberError } = await supabase
-      .from('cards')
-      .update({ members: currentMembers })
-      .eq('id', card_id);
+      const { error: memberError } = await supabase
+        .from('cards')
+        .update({
+          members: nextMembers
+        })
+        .eq('id', card_id);
 
-    if (memberError) {
-      console.error('Failed to add agent to card members:', memberError);
+      if (memberError) {
+        console.error('Failed to add agent to card members:', memberError);
+      }
     }
 
     return res.json({ profile_id: agentProfile.id, fingerprint, kyc_status: 'pending' });

@@ -59,16 +59,23 @@ router.post('/', async (req, res) => {
     const { name, card_name, description } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
 
+    const { data: ownerProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('auth_id', req.user.id)
+      .single();
+
+    const ownerProfileId = ownerProfile?.id || req.user.id;
     const invite_code = randomBytes(6).toString('hex').toUpperCase();
 
-    const { data, error } = await supabase
+    const { data: newCard, error } = await supabase
       .from('cards')
       .insert({
         name,
         card_name: card_name || name,
         description: description || null,
         owner_id: req.user.id,
-        members: [req.profile.id],
+        members: [ownerProfileId],
         total_balance: 0,
         spending_limits: { daily_cap: 0, max_per_txn: 0 },
         invite_code,
@@ -79,7 +86,29 @@ router.post('/', async (req, res) => {
       .single();
 
     if (error) return res.status(500).json({ error: error.message });
-    res.status(201).json(data);
+
+    try {
+      const { lithic } = require('../config/providers');
+      const lithicCard = await lithic.cards.create({
+        type: 'VIRTUAL',
+        spend_limit: 500000,
+        spend_limit_duration: 'FOREVER'
+      });
+
+      await supabase
+        .from('cards')
+        .update({
+          card_token: lithicCard.token,
+          card_status: 'OPEN'
+        })
+        .eq('id', newCard.id);
+
+      newCard.card_token = lithicCard.token;
+    } catch (err) {
+      console.error('Lithic auto-create failed:', err.message);
+    }
+
+    res.status(201).json(newCard);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
