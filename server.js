@@ -11,15 +11,35 @@ const { supabase } = require('./config/providers');
 const app = express();
 app.set('trust proxy', 1);
 app.use(helmet());
+
+// Comma-separated list, e.g. CORS_ORIGINS=https://app.example.com,https://staging.example.com
+const corsOriginsExtra = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+if (process.env.FRONTEND_URL?.trim()) {
+  corsOriginsExtra.push(process.env.FRONTEND_URL.trim());
+}
+
+function isAllowedCorsOrigin(origin) {
+  if (!origin) return true;
+  if (corsOriginsExtra.includes(origin)) return true;
+  if (
+    origin.endsWith('.vercel.app') ||
+    origin.endsWith('.onrender.com') ||
+    origin === 'http://localhost:5173' ||
+    origin === 'http://localhost:3000'
+  ) {
+    return true;
+  }
+  return false;
+}
+
 const corsOptions = {
   origin: function(origin, callback) {
-    if (!origin) return callback(null, true)
-    if (
-      origin.endsWith('.vercel.app') ||
-      origin === 'http://localhost:5173' ||
-      origin === 'http://localhost:3000'
-    ) {
-      callback(null, true)
+    if (!origin) return callback(null, true);
+    if (isAllowedCorsOrigin(origin)) {
+      callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'))
     }
