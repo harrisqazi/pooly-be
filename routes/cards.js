@@ -59,10 +59,13 @@ router.post('/', async (req, res) => {
     const { name, card_name, description } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
 
-    const ownerProfileId = req.profile?.id;
-    if (!ownerProfileId) {
-      return res.status(500).json({ error: 'Owner profile not found' });
-    }
+    const { data: ownerProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('auth_id', req.user.id)
+      .single();
+
+    const ownerProfileId = ownerProfile?.id || req.user.id;
     const invite_code = randomBytes(6).toString('hex').toUpperCase();
 
     const { data: newCard, error } = await supabase

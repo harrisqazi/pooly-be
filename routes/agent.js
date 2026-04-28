@@ -253,7 +253,6 @@ const authMiddleware = require('../middleware/auth');
 router.post('/register', authMiddleware, async (req, res) => {
   try {
     const { card_id, agent_name, model_name, model_version, system_prompt } = req.body;
-    console.log('card_id received:', card_id);
     if (!card_id || !agent_name || !model_name || !system_prompt) {
       return res.status(400).json({ error: 'card_id, agent_name, model_name, system_prompt required' });
     }
@@ -332,7 +331,6 @@ router.post('/register', authMiddleware, async (req, res) => {
       if (memberError) {
         console.error('Failed to add agent to card members:', memberError);
       }
-      console.log('Updated card members to:', nextMembers);
     }
 
     return res.json({ profile_id: agentProfile.id, fingerprint, kyc_status: 'pending' });
