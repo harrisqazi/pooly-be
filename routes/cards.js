@@ -25,6 +25,54 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * Members with profile rows (auth UUID for owner checks)
+ * GET /api/cards/:id/members
+ */
+router.get('/:id/members', async (req, res) => {
+  try {
+    const { data: card, error } = await supabase
+      .from('cards')
+      .select('owner_id, members')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error || !card) return res.status(404).json({ error: 'Card not found' });
+
+    let memberIds = card.members || [];
+    if (typeof memberIds === 'string') {
+      try {
+        memberIds = JSON.parse(memberIds);
+      } catch {
+        memberIds = [];
+      }
+    }
+    if (!Array.isArray(memberIds)) memberIds = [];
+
+    const isMember = memberIds.includes(req.profile.id);
+    const isOwner = card.owner_id === req.user.id;
+    if (!isMember && !isOwner) {
+      return res.status(403).json({ error: 'Not authorized to view this card' });
+    }
+
+    if (memberIds.length === 0) return res.json([]);
+
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, auth_id, first_name, last_name, email, type, avatar_url')
+      .in('id', memberIds);
+
+    if (profilesError) return res.status(500).json({ error: profilesError.message });
+
+    const byId = Object.fromEntries((profiles || []).map((p) => [p.id, p]));
+    const ordered = memberIds.map((id) => byId[id]).filter(Boolean);
+
+    res.json(ordered);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * Get a specific card (wallet)
  * GET /api/cards/:id
  */
