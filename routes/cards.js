@@ -5,6 +5,18 @@ const router = express.Router();
 const { randomBytes } = require('crypto');
 const { supabase } = require('../config/providers');
 
+function normalizeJsonArrayField(raw) {
+  let value = raw || [];
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      value = [];
+    }
+  }
+  return Array.isArray(value) ? value : [];
+}
+
 /**
  * List all cards (wallets) the user owns or is a member of
  * GET /api/cards
@@ -32,21 +44,13 @@ router.get('/:id/members', async (req, res) => {
   try {
     const { data: card, error } = await supabase
       .from('cards')
-      .select('owner_id, members')
+      .select('*')
       .eq('id', req.params.id)
       .single();
 
     if (error || !card) return res.status(404).json({ error: 'Card not found' });
 
-    let memberIds = card.members || [];
-    if (typeof memberIds === 'string') {
-      try {
-        memberIds = JSON.parse(memberIds);
-      } catch {
-        memberIds = [];
-      }
-    }
-    if (!Array.isArray(memberIds)) memberIds = [];
+    let memberIds = normalizeJsonArrayField(card.members);
 
     const isMember = memberIds.includes(req.profile.id);
     const isOwner = card.owner_id === req.user.id;
@@ -54,19 +58,53 @@ router.get('/:id/members', async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to view this card' });
     }
 
-    if (memberIds.length === 0) return res.json([]);
+    // Owner profile UUID is often omitted from legacy `cards.members`; always merge so humans show with agents.
+    const { data: ownerProfile } = await supabase
+      .from('profiles')
+      .select('id, auth_id, first_name, last_name, email, type, avatar_url')
+      .eq('auth_id', card.owner_id)
+      .maybeSingle();
+
+    const ownerProfileId = ownerProfile?.id;
+    const idsToFetchSet = new Set(memberIds.filter(Boolean));
+    if (ownerProfileId) idsToFetchSet.add(ownerProfileId);
+
+    const idsToFetch = [...idsToFetchSet];
+    if (idsToFetch.length === 0) return res.json([]);
 
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, auth_id, first_name, last_name, email, type, avatar_url')
-      .in('id', memberIds);
+      .in('id', idsToFetch);
 
     if (profilesError) return res.status(500).json({ error: profilesError.message });
 
-    const byId = Object.fromEntries((profiles || []).map((p) => [p.id, p]));
-    const ordered = memberIds.map((id) => byId[id]).filter(Boolean);
+    const adminIds = normalizeJsonArrayField(card.admin_ids);
 
-    res.json(ordered);
+    const byId = Object.fromEntries((profiles || []).map((p) => [p.id, p]));
+
+    const ordered = [];
+    const seen = new Set();
+    const pushProfile = (p) => {
+      if (!p || seen.has(p.id)) return;
+      seen.add(p.id);
+      ordered.push(p);
+    };
+
+    if (ownerProfileId) pushProfile(byId[ownerProfileId]);
+    for (const id of memberIds) {
+      pushProfile(byId[id]);
+    }
+
+    const payload = ordered.map((p) => ({
+      ...p,
+      is_owner: !!p.auth_id && p.auth_id === card.owner_id,
+      is_admin:
+        (!!p.auth_id && p.auth_id === card.owner_id) ||
+        adminIds.includes(p.id),
+    }));
+
+    res.json(payload);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -86,7 +124,7 @@ router.get('/:id', async (req, res) => {
 
     if (error || !card) return res.status(404).json({ error: 'Card not found' });
 
-    const members = card.members || [];
+    const members = normalizeJsonArrayField(card.members);
     const isMember = members.includes(req.profile.id);
     const isOwner = card.owner_id === req.user.id;
     if (!isMember && !isOwner) return res.status(403).json({ error: 'Not authorized to view this card' });
@@ -180,7 +218,7 @@ router.post('/join', async (req, res) => {
 
     if (findError || !card) return res.status(404).json({ error: 'Card not found' });
 
-    const members = card.members || [];
+    const members = normalizeJsonArrayField(card.members);
     if (members.includes(req.profile.id)) {
       return res.status(400).json({ error: 'Already a member' });
     }
@@ -196,6 +234,77 @@ router.post('/join', async (req, res) => {
 
     if (updateError) return res.status(500).json({ error: updateError.message });
     res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Promote a member to admin (additional admins beyond owner). Requires cards.admin_ids (jsonb).
+ * POST /api/cards/:id/admins  Body: { profile_id }
+ */
+router.post('/:id/admins', async (req, res) => {
+  try {
+    const profileId = (req.body?.profile_id || '').trim();
+    if (!profileId) {
+      return res.status(400).json({ error: 'profile_id is required' });
+    }
+
+    const { data: card, error } = await supabase
+      .from('cards')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error || !card) return res.status(404).json({ error: 'Card not found' });
+    if (card.owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Only the owner can add admins' });
+    }
+
+    const memberIds = normalizeJsonArrayField(card.members);
+    if (!memberIds.includes(profileId)) {
+      return res.status(400).json({ error: 'User must be a member before they can be an admin' });
+    }
+
+    const { data: target } = await supabase
+      .from('profiles')
+      .select('auth_id, type')
+      .eq('id', profileId)
+      .single();
+
+    if (!target) return res.status(404).json({ error: 'Profile not found' });
+    if (target.type === 'agent') {
+      return res.status(400).json({ error: 'Agents cannot be admins' });
+    }
+
+    const { data: ownerProf } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('auth_id', card.owner_id)
+      .maybeSingle();
+
+    if (ownerProf?.id === profileId) {
+      return res.status(400).json({ error: 'Owner is already an admin' });
+    }
+
+    let adminIds = normalizeJsonArrayField(card.admin_ids);
+
+    if (adminIds.includes(profileId)) {
+      return res.status(400).json({ error: 'Already an admin' });
+    }
+
+    adminIds = [...adminIds, profileId];
+
+    const { data: updated, error: upErr } = await supabase
+      .from('cards')
+      .update({ admin_ids: adminIds })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (upErr) return res.status(500).json({ error: upErr.message });
+
+    res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
