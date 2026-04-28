@@ -163,6 +163,7 @@ router.post('/', async (req, res) => {
         owner_id: req.user.id,
         members: [ownerProfileId],
         total_balance: 0,
+        approval_threshold: 0,
         spending_limits: { daily_cap: 0, max_per_txn: 0 },
         invite_code,
         group_code: invite_code,
@@ -304,6 +305,60 @@ router.post('/:id/admins', async (req, res) => {
 
     if (upErr) return res.status(500).json({ error: upErr.message });
 
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Update card fields (owner only). Used for approval threshold, spending_limits, card image, etc.
+ * PUT /api/cards/:id
+ */
+router.put('/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const { data: card, error: findError } = await supabase
+      .from('cards')
+      .select('owner_id, spending_limits')
+      .eq('id', id)
+      .single();
+
+    if (findError || !card) return res.status(404).json({ error: 'Card not found' });
+    if (card.owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Only the owner can update this card' });
+    }
+
+    const b = req.body || {};
+    const patch = { updated_at: new Date().toISOString() };
+
+    if (b.name !== undefined) patch.name = b.name;
+    if (b.card_name !== undefined) patch.card_name = b.card_name;
+    if (b.description !== undefined) patch.description = b.description;
+    if (b.card_image_url !== undefined) patch.card_image_url = b.card_image_url;
+    if (b.card_status !== undefined) patch.card_status = b.card_status;
+    if (b.approval_threshold !== undefined) {
+      patch.approval_threshold = Number(b.approval_threshold);
+    }
+
+    if (b.spending_limits !== undefined && typeof b.spending_limits === 'object') {
+      patch.spending_limits = {
+        ...(typeof card.spending_limits === 'object' && card.spending_limits
+          ? card.spending_limits
+          : {}),
+        ...b.spending_limits,
+      };
+    }
+
+    const { data: updated, error } = await supabase
+      .from('cards')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });

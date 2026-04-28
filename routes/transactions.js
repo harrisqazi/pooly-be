@@ -5,6 +5,40 @@ const router = express.Router();
 const { supabase } = require('../config/providers');
 const { createLedgerEntry, updateCardBalance } = require('../utils/ledger');
 
+function normalizeJsonArrayField(raw) {
+  let value = raw || [];
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      value = [];
+    }
+  }
+  return Array.isArray(value) ? value : [];
+}
+
+/**
+ * Owner profile UUID + profiles listed in cards.admin_ids
+ */
+async function getAdminProfileIdsForCard(card) {
+  if (!card) return [];
+
+  const { data: ownerProf } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('auth_id', card.owner_id)
+    .maybeSingle();
+
+  const extras = normalizeJsonArrayField(card.admin_ids);
+  const out = [];
+  if (ownerProf?.id) out.push(ownerProf.id);
+  for (const id of extras) {
+    if (id && !out.includes(id)) out.push(id);
+  }
+
+  return out;
+}
+
 /**
  * List transactions for a card (wallet)
  * GET /api/transactions?card_id=xxx&status=xxx
@@ -180,9 +214,12 @@ router.post('/:id/approve', async (req, res) => {
     if (transaction.status !== 'pending') return res.status(400).json({ error: 'Transaction is not pending' });
 
     const card = transaction.cards;
-    const members = card?.members || [];
-    if (!members.includes(req.profile.id) && card?.owner_id !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to approve this transaction' });
+    const adminProfileIds = await getAdminProfileIdsForCard(card);
+    if (adminProfileIds.length === 0) {
+      return res.status(500).json({ error: 'Could not resolve card admins' });
+    }
+    if (!adminProfileIds.includes(req.profile.id)) {
+      return res.status(403).json({ error: 'Only admins can approve transactions on this card' });
     }
 
     await supabase.from('approvals').insert({
@@ -201,8 +238,21 @@ router.post('/:id/approve', async (req, res) => {
       .eq('transaction_id', transaction.id)
       .eq('status', 'approved');
 
-    const threshold = card?.approval_threshold || 1;
-    if ((approvals || []).length >= threshold) {
+    const uniqAdminApproverCount = new Set(
+      (approvals || [])
+        .filter((a) => adminProfileIds.includes(a.approver_id))
+        .map((a) => a.approver_id)
+    ).size;
+
+    const configured = Number(card.approval_threshold ?? 0);
+    let required;
+    if (configured <= 0) {
+      required = adminProfileIds.length;
+    } else {
+      required = Math.min(configured, adminProfileIds.length);
+    }
+
+    if (uniqAdminApproverCount >= required && required > 0) {
       if (Number(card.total_balance) >= Number(transaction.amount)) {
         await supabase.from('transactions').update({ status: 'completed' }).eq('id', transaction.id);
         await createLedgerEntry({
@@ -239,9 +289,9 @@ router.post('/:id/deny', async (req, res) => {
     if (transaction.status !== 'pending') return res.status(400).json({ error: 'Transaction is not pending' });
 
     const card = transaction.cards;
-    const members = card?.members || [];
-    if (!members.includes(req.profile.id) && card?.owner_id !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to deny this transaction' });
+    const adminProfileIds = await getAdminProfileIdsForCard(card);
+    if (!adminProfileIds.includes(req.profile.id)) {
+      return res.status(403).json({ error: 'Only admins can deny transactions on this card' });
     }
 
     await supabase.from('approvals').insert({
