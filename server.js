@@ -25,8 +25,6 @@ function isAllowedCorsOrigin(origin) {
   if (!origin) return true;
   if (corsOriginsExtra.includes(origin)) return true;
   if (
-    origin === 'https://pooly.org' ||
-    origin === 'https://www.pooly.org' ||
     origin.endsWith('.vercel.app') ||
     origin.endsWith('.onrender.com') ||
     origin === 'http://localhost:5173' ||
