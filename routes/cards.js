@@ -371,17 +371,68 @@ router.put('/:id', async (req, res) => {
  */
 router.delete('/:id', async (req, res) => {
   try {
+    const cardId = req.params.id;
     const { data: card, error: findError } = await supabase
       .from('cards')
       .select('owner_id')
-      .eq('id', req.params.id)
+      .eq('id', cardId)
       .single();
 
     if (findError || !card) return res.status(404).json({ error: 'Card not found' });
     if (card.owner_id !== req.user.id) return res.status(403).json({ error: 'Only the owner can delete this card' });
 
-    const { error } = await supabase.from('cards').delete().eq('id', req.params.id);
-    if (error) return res.status(500).json({ error: error.message });
+    const isMissingTable = (err) => err?.code === '42P01';
+
+    // Best-effort cleanup of dependent rows so card deletion doesn't fail on FK constraints.
+    const { data: txRows, error: txFindError } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('card_id', cardId);
+    if (txFindError && !isMissingTable(txFindError)) {
+      return res.status(500).json({ error: txFindError.message });
+    }
+    const txIds = (txRows || []).map((t) => t.id).filter(Boolean);
+
+    if (txIds.length > 0) {
+      const { error: approvalsErr } = await supabase
+        .from('approvals')
+        .delete()
+        .in('transaction_id', txIds);
+      if (approvalsErr && !isMissingTable(approvalsErr)) {
+        return res.status(500).json({ error: approvalsErr.message });
+      }
+
+      const { error: ledgerErr } = await supabase
+        .from('ledger_entries')
+        .delete()
+        .in('transaction_id', txIds);
+      if (ledgerErr && !isMissingTable(ledgerErr)) {
+        return res.status(500).json({ error: ledgerErr.message });
+      }
+    }
+
+    const cleanupTables = ['transactions', 'transfers', 'topups', 'agent_spend_log', 'anomaly_log', 'webhook_events'];
+    for (const table of cleanupTables) {
+      const { error: cleanupErr } = await supabase
+        .from(table)
+        .delete()
+        .eq('card_id', cardId);
+      if (cleanupErr && !isMissingTable(cleanupErr)) {
+        return res.status(500).json({ error: cleanupErr.message });
+      }
+    }
+
+    const { error } = await supabase.from('cards').delete().eq('id', cardId);
+    if (error) {
+      // Common for lingering FK references; surface a clearer, actionable error.
+      if (error.code === '23503') {
+        return res.status(409).json({
+          error: 'Card cannot be deleted because related records still exist',
+          detail: error.detail || error.message,
+        });
+      }
+      return res.status(500).json({ error: error.message });
+    }
 
     res.json({ success: true, message: 'Card deleted' });
   } catch (err) {
