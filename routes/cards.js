@@ -371,17 +371,64 @@ router.put('/:id', async (req, res) => {
  */
 router.delete('/:id', async (req, res) => {
   try {
+    const cardId = req.params.id;
     const { data: card, error: findError } = await supabase
       .from('cards')
       .select('owner_id')
-      .eq('id', req.params.id)
+      .eq('id', cardId)
       .single();
 
     if (findError || !card) return res.status(404).json({ error: 'Card not found' });
     if (card.owner_id !== req.user.id) return res.status(403).json({ error: 'Only the owner can delete this card' });
 
-    const { error } = await supabase.from('cards').delete().eq('id', req.params.id);
-    if (error) return res.status(500).json({ error: error.message });
+    // Schema-aware cleanup before deleting cards row:
+    // - transactions.card_id has NO ACTION
+    // - anomaly_log.card_id has NO ACTION
+    // Also clear per-transaction dependents that can block transaction deletes.
+    const { data: txRows, error: txErr } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('card_id', cardId);
+    if (txErr) return res.status(500).json({ error: txErr.message });
+    const txIds = (txRows || []).map((t) => t.id).filter(Boolean);
+
+    if (txIds.length > 0) {
+      const { error: approvalsErr } = await supabase
+        .from('approvals')
+        .delete()
+        .in('transaction_id', txIds);
+      if (approvalsErr) return res.status(500).json({ error: approvalsErr.message });
+
+      const { error: ledgerErr } = await supabase
+        .from('ledger_entries')
+        .delete()
+        .in('transaction_id', txIds);
+      // ledger_entries may not exist in all environments; ignore undefined-table.
+      if (ledgerErr && ledgerErr.code !== '42P01') {
+        return res.status(500).json({ error: ledgerErr.message });
+      }
+    }
+
+    const { error: txDeleteErr } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('card_id', cardId);
+    if (txDeleteErr) return res.status(500).json({ error: txDeleteErr.message });
+
+    const { error: anomalyDeleteErr } = await supabase
+      .from('anomaly_log')
+      .delete()
+      .eq('card_id', cardId);
+    if (anomalyDeleteErr) return res.status(500).json({ error: anomalyDeleteErr.message });
+
+    const { error } = await supabase.from('cards').delete().eq('id', cardId);
+    if (error) {
+      return res.status(500).json({
+        error: error.message,
+        code: error.code || null,
+        detail: error.detail || null,
+      });
+    }
 
     res.json({ success: true, message: 'Card deleted' });
   } catch (err) {
